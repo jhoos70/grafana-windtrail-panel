@@ -68,7 +68,7 @@
         }
       ],
       "title": "Wind Direction Trail (Live Converted by $speed_unit Variable)",
-      "type": "jhoos70-windtrail-panel"
+      "type": "tealwagon1458-windtrail-panel"
     },
     {
       "datasource": {
@@ -118,7 +118,7 @@
         }
       ],
       "title": "Wind Direction Trail (Time Fading + Speed Thickness)",
-      "type": "jhoos70-windtrail-panel"
+      "type": "tealwagon1458-windtrail-panel"
     },
     {
       "datasource": {
@@ -167,7 +167,7 @@
         }
       ],
       "title": "Wind Direction Trail (Speed Color + Fading)",
-      "type": "jhoos70-windtrail-panel"
+      "type": "tealwagon1458-windtrail-panel"
     },
     {
       "datasource": {
@@ -216,7 +216,7 @@
         }
       ],
       "title": "Wind Direction Trail (16 Compass Spokes + Speed Scale)",
-      "type": "jhoos70-windtrail-panel"
+      "type": "tealwagon1458-windtrail-panel"
     }
   ],
   "refresh": "",

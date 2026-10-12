@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
   "type": "panel",
   "name": "Wind Direction Trail",
-  "id": "jhoos70-windtrail-panel",
+  "id": "tealwagon1458-windtrail-panel",
   "info": {
     "keywords": ["panel", "wind", "direction", "polar", "compass", "weather", "trajectory"],
     "description": "Visualizes wind direction over time as a polar trajectory wandering across a 360-degree compass rose.",

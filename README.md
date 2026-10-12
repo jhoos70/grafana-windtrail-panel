@@ -4,6 +4,13 @@ A custom Grafana panel plugin that visualizes **wind direction over time** in a 
 
 Instead of a traditional linear time-series chart—which suffers from awkward discontinuities whenever the wind fluctuates across North ($359^\circ \leftrightarrow 1^\circ$)—this panel maps **time radially** and **direction angularly**. The wind direction trajectory starts at the center and wanders outward over time (or vice versa), tracing a continuous polar trail.
 
+![Wind Direction Trail Dashboard Overview](src/img/screenshot-overview.png)
+
+<p align="center">
+  <img src="src/img/screenshot-panel-multicolor.png" width="49%" alt="Speed Color Ramp with Live HUD and Scale Legend" />
+  <img src="src/img/screenshot-panel-fading.png" width="49%" alt="Time Fading and Speed-Proportional Thickness" />
+</p>
+
 ---
 
 ## Features

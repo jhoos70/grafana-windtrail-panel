@@ -20,7 +20,20 @@
         "url": "https://github.com/jhoos70/grafana-windtrail-panel"
       }
     ],
-    "screenshots": [],
+    "screenshots": [
+      {
+        "name": "Dashboard Overview",
+        "path": "img/screenshot-overview.png"
+      },
+      {
+        "name": "Speed Color Ramp and Live HUD",
+        "path": "img/screenshot-panel-multicolor.png"
+      },
+      {
+        "name": "Time Fading and Variable Line Thickness",
+        "path": "img/screenshot-panel-fading.png"
+      }
+    ],
     "version": "%VERSION%",
     "updated": "%TODAY%"
   },

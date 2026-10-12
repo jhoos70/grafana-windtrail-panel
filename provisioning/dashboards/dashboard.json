@@ -1,0 +1,262 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 1,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "grafana-testdata-datasource",
+        "uid": "trlxrdZVk"
+      },
+      "gridPos": {
+        "h": 14,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "timeDirection": "center-to-edge",
+        "timeRangeSource": "data",
+        "spokeCount": 8,
+        "ringCount": 4,
+        "strokeWidth": 3,
+        "scaleWidthBySpeed": true,
+        "minStrokeWidth": 1.5,
+        "maxStrokeWidth": 8,
+        "colorMode": "speed",
+        "solidColor": "#38bdf8",
+        "showPoints": true,
+        "pointRadius": 3,
+        "showHeadMarker": true,
+        "headMarkerColor": "#ef4444",
+        "showTimeLabels": true,
+        "showCardinalLabels": true,
+        "inputSpeedUnit": "m/s",
+        "displaySpeedUnit": "$speed_unit",
+        "showLegend": true,
+        "legendPosition": "bottom-right"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-testdata-datasource",
+            "uid": "trlxrdZVk"
+          },
+          "refId": "A",
+          "scenarioId": "raw_frame",
+          "rawFrameContent": "[\n  {\n    \"columns\": [\n      {\n        \"text\": \"time\",\n        \"type\": \"time\"\n      },\n      {\n        \"text\": \"wind_direction\",\n        \"type\": \"number\"\n      },\n      {\n        \"text\": \"wind_speed\",\n        \"type\": \"number\"\n      }\n    ],\n    \"rows\": [\n      [1775973900000,140,5],\n      [1775974800000,160,6.6],\n      [1775975700000,172,7.8],\n      [1775976600000,172,8.4],\n      [1775977500000,163,8.3],\n      [1775978400000,155,7.5],\n      [1775979300000,156,6.2],\n      [1775980200000,169,4.9],\n      [1775981100000,190,3.8],\n      [1775982000000,210,3.3],\n      [1775982900000,220,3.5],\n      [1775983800000,218,4.4],\n      [1775984700000,209,5.8],\n      [1775985600000,201,7.4],\n      [1775986500000,204,8.8],\n      [1775987400000,219,9.8],\n      [1775988300000,241,10.1],\n      [1775989200000,259,9.7],\n      [1775990100000,267,8.6],\n      [1775991000000,264,7.3],\n      [1775991900000,254,6],\n      [1775992800000,248,5.2],\n      [1775993700000,253,4.9],\n      [1775994600000,269,5.4],\n      [1775995500000,291,6.6],\n      [1775996400000,308,8.1],\n      [1775997300000,315,9.7],\n      [1775998200000,310,11],\n      [1775999100000,300,11.7],\n      [1776000000000,295,11.7]\n    ]\n  }\n]"
+        }
+      ],
+      "title": "Wind Direction Trail (Live Converted by $speed_unit Variable)",
+      "type": "jhoos70-windtrail-panel"
+    },
+    {
+      "datasource": {
+        "type": "grafana-testdata-datasource",
+        "uid": "trlxrdZVk"
+      },
+      "gridPos": {
+        "h": 14,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "timeDirection": "center-to-edge",
+        "timeRangeSource": "data",
+        "spokeCount": 16,
+        "ringCount": 5,
+        "strokeWidth": 2.5,
+        "scaleWidthBySpeed": true,
+        "fadeOverTime": true,
+        "minOpacity": 0.15,
+        "minStrokeWidth": 1.5,
+        "maxStrokeWidth": 7.5,
+        "colorMode": "solid",
+        "solidColor": "#38bdf8",
+        "showPoints": true,
+        "pointRadius": 2.5,
+        "showHeadMarker": true,
+        "headMarkerColor": "#f43f5e",
+        "showTimeLabels": true,
+        "showCardinalLabels": true,
+        "inputSpeedUnit": "m/s",
+        "displaySpeedUnit": "$speed_unit",
+        "showLegend": true,
+        "legendPosition": "bottom-right"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-testdata-datasource",
+            "uid": "trlxrdZVk"
+          },
+          "refId": "A",
+          "scenarioId": "raw_frame",
+          "rawFrameContent": "[\n  {\n    \"columns\": [\n      {\n        \"text\": \"time\",\n        \"type\": \"time\"\n      },\n      {\n        \"text\": \"wind_direction\",\n        \"type\": \"number\"\n      },\n      {\n        \"text\": \"wind_speed\",\n        \"type\": \"number\"\n      }\n    ],\n    \"rows\": [\n      [1775973900000,140,5],\n      [1775974800000,160,6.6],\n      [1775975700000,172,7.8],\n      [1775976600000,172,8.4],\n      [1775977500000,163,8.3],\n      [1775978400000,155,7.5],\n      [1775979300000,156,6.2],\n      [1775980200000,169,4.9],\n      [1775981100000,190,3.8],\n      [1775982000000,210,3.3],\n      [1775982900000,220,3.5],\n      [1775983800000,218,4.4],\n      [1775984700000,209,5.8],\n      [1775985600000,201,7.4],\n      [1775986500000,204,8.8],\n      [1775987400000,219,9.8],\n      [1775988300000,241,10.1],\n      [1775989200000,259,9.7],\n      [1775990100000,267,8.6],\n      [1775991000000,264,7.3],\n      [1775991900000,254,6],\n      [1775992800000,248,5.2],\n      [1775993700000,253,4.9],\n      [1775994600000,269,5.4],\n      [1775995500000,291,6.6],\n      [1775996400000,308,8.1],\n      [1775997300000,315,9.7],\n      [1775998200000,310,11],\n      [1775999100000,300,11.7],\n      [1776000000000,295,11.7]\n    ]\n  }\n]"
+        }
+      ],
+      "title": "Wind Direction Trail (Time Fading + Speed Thickness)",
+      "type": "jhoos70-windtrail-panel"
+    },
+    {
+      "datasource": {
+        "type": "grafana-testdata-datasource",
+        "uid": "trlxrdZVk"
+      },
+      "gridPos": {
+        "h": 14,
+        "w": 12,
+        "x": 0,
+        "y": 14
+      },
+      "id": 3,
+      "options": {
+        "timeDirection": "center-to-edge",
+        "timeRangeSource": "data",
+        "spokeCount": 8,
+        "ringCount": 4,
+        "strokeWidth": 2.5,
+        "scaleWidthBySpeed": true,
+        "minStrokeWidth": 1.5,
+        "maxStrokeWidth": 8,
+        "fadeOverTime": true,
+        "minOpacity": 0.2,
+        "colorMode": "speed",
+        "showPoints": true,
+        "pointRadius": 2.5,
+        "showHeadMarker": true,
+        "headMarkerColor": "#ef4444",
+        "showTimeLabels": true,
+        "showCardinalLabels": true,
+        "inputSpeedUnit": "m/s",
+        "displaySpeedUnit": "$speed_unit",
+        "showLegend": true,
+        "legendPosition": "bottom-right"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-testdata-datasource",
+            "uid": "trlxrdZVk"
+          },
+          "refId": "A",
+          "scenarioId": "raw_frame",
+          "rawFrameContent": "[\n  {\n    \"columns\": [\n      {\n        \"text\": \"time\",\n        \"type\": \"time\"\n      },\n      {\n        \"text\": \"wind_direction\",\n        \"type\": \"number\"\n      },\n      {\n        \"text\": \"wind_speed\",\n        \"type\": \"number\"\n      }\n    ],\n    \"rows\": [\n      [1775973900000,140,5],\n      [1775974800000,160,6.6],\n      [1775975700000,172,7.8],\n      [1775976600000,172,8.4],\n      [1775977500000,163,8.3],\n      [1775978400000,155,7.5],\n      [1775979300000,156,6.2],\n      [1775980200000,169,4.9],\n      [1775981100000,190,3.8],\n      [1775982000000,210,3.3],\n      [1775982900000,220,3.5],\n      [1775983800000,218,4.4],\n      [1775984700000,209,5.8],\n      [1775985600000,201,7.4],\n      [1775986500000,204,8.8],\n      [1775987400000,219,9.8],\n      [1775988300000,241,10.1],\n      [1775989200000,259,9.7],\n      [1775990100000,267,8.6],\n      [1775991000000,264,7.3],\n      [1775991900000,254,6],\n      [1775992800000,248,5.2],\n      [1775993700000,253,4.9],\n      [1775994600000,269,5.4],\n      [1775995500000,291,6.6],\n      [1775996400000,308,8.1],\n      [1775997300000,315,9.7],\n      [1775998200000,310,11],\n      [1775999100000,300,11.7],\n      [1776000000000,295,11.7]\n    ]\n  }\n]"
+        }
+      ],
+      "title": "Wind Direction Trail (Speed Color + Fading)",
+      "type": "jhoos70-windtrail-panel"
+    },
+    {
+      "datasource": {
+        "type": "grafana-testdata-datasource",
+        "uid": "trlxrdZVk"
+      },
+      "gridPos": {
+        "h": 14,
+        "w": 12,
+        "x": 12,
+        "y": 14
+      },
+      "id": 4,
+      "options": {
+        "timeDirection": "center-to-edge",
+        "timeRangeSource": "data",
+        "spokeCount": 16,
+        "ringCount": 4,
+        "strokeWidth": 2.5,
+        "scaleWidthBySpeed": true,
+        "minStrokeWidth": 1.5,
+        "maxStrokeWidth": 8,
+        "fadeOverTime": true,
+        "minOpacity": 0.2,
+        "colorMode": "speed",
+        "showPoints": true,
+        "pointRadius": 2.5,
+        "showHeadMarker": true,
+        "headMarkerColor": "#ef4444",
+        "showTimeLabels": true,
+        "showCardinalLabels": true,
+        "inputSpeedUnit": "m/s",
+        "displaySpeedUnit": "$speed_unit",
+        "showLegend": true,
+        "legendPosition": "bottom-right"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-testdata-datasource",
+            "uid": "trlxrdZVk"
+          },
+          "refId": "A",
+          "scenarioId": "raw_frame",
+          "rawFrameContent": "[\n  {\n    \"columns\": [\n      {\n        \"text\": \"time\",\n        \"type\": \"time\"\n      },\n      {\n        \"text\": \"wind_direction\",\n        \"type\": \"number\"\n      },\n      {\n        \"text\": \"wind_speed\",\n        \"type\": \"number\"\n      }\n    ],\n    \"rows\": [\n      [1775973900000,140,5],\n      [1775974800000,160,6.6],\n      [1775975700000,172,7.8],\n      [1775976600000,172,8.4],\n      [1775977500000,163,8.3],\n      [1775978400000,155,7.5],\n      [1775979300000,156,6.2],\n      [1775980200000,169,4.9],\n      [1775981100000,190,3.8],\n      [1775982000000,210,3.3],\n      [1775982900000,220,3.5],\n      [1775983800000,218,4.4],\n      [1775984700000,209,5.8],\n      [1775985600000,201,7.4],\n      [1775986500000,204,8.8],\n      [1775987400000,219,9.8],\n      [1775988300000,241,10.1],\n      [1775989200000,259,9.7],\n      [1775990100000,267,8.6],\n      [1775991000000,264,7.3],\n      [1775991900000,254,6],\n      [1775992800000,248,5.2],\n      [1775993700000,253,4.9],\n      [1775994600000,269,5.4],\n      [1775995500000,291,6.6],\n      [1775996400000,308,8.1],\n      [1775997300000,315,9.7],\n      [1775998200000,310,11],\n      [1775999100000,300,11.7],\n      [1776000000000,295,11.7]\n    ]\n  }\n]"
+        }
+      ],
+      "title": "Wind Direction Trail (16 Compass Spokes + Speed Scale)",
+      "type": "jhoos70-windtrail-panel"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 39,
+  "tags": ["wind", "weather"],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": "Kilometers per hour (km/h)",
+          "value": "km/h"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Wind Speed Unit",
+        "multi": false,
+        "name": "speed_unit",
+        "options": [
+          { "selected": false, "text": "Meters per second (m/s)", "value": "m/s" },
+          { "selected": true, "text": "Kilometers per hour (km/h)", "value": "km/h" },
+          { "selected": false, "text": "Knots (kn)", "value": "knots" },
+          { "selected": false, "text": "Beaufort scale (Bft)", "value": "bft" },
+          { "selected": false, "text": "Miles per hour (mph)", "value": "mph" }
+        ],
+        "query": "m/s, km/h, knots, bft, mph",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      }
+    ]
+  },
+  "time": {
+    "from": "2026-04-12T06:05:00.000Z",
+    "to": "2026-04-12T13:20:00.000Z"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Wind Direction Trail Demo",
+  "uid": "windtrail-demo",
+  "version": 1,
+  "weekStart": ""
+}

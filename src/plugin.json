@@ -1,0 +1,31 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
+  "type": "panel",
+  "name": "Wind Direction Trail",
+  "id": "jhoos70-windtrail-panel",
+  "info": {
+    "keywords": ["panel", "wind", "direction", "polar", "compass", "weather", "trajectory"],
+    "description": "Visualizes wind direction over time as a polar trajectory wandering across a 360-degree compass rose.",
+    "author": {
+      "name": "jhoos70",
+      "url": "https://github.com/jhoos70"
+    },
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "links": [
+      {
+        "name": "GitHub",
+        "url": "https://github.com/jhoos70/grafana-windtrail-panel"
+      }
+    ],
+    "screenshots": [],
+    "version": "%VERSION%",
+    "updated": "%TODAY%"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=10.0.0",
+    "plugins": []
+  }
+}

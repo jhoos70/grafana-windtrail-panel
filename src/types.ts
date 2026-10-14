@@ -1,5 +1,6 @@
 export type TimeDirection = 'center-to-edge' | 'edge-to-center';
 export type TimeRangeSource = 'dashboard' | 'data';
+export type CurveMode = 'polar' | 'linear';
 export type SpokeCount = 4 | 8 | 16;
 export type ColorMode = 'speed' | 'solid';
 export type SpeedUnit = 'auto' | 'm/s' | 'km/h' | 'knots' | 'mph' | 'ft/s' | (string & {});
@@ -12,6 +13,7 @@ export interface WindTrailOptions {
   spokeCount: SpokeCount;
   ringCount: number;
   strokeWidth: number;
+  curveMode?: CurveMode;
   scaleWidthBySpeed: boolean;
   fadeWidthOverTime: boolean;
   minStrokeWidth: number;

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef } from 'react';
 import { PanelProps, dateTimeFormat, DataFrame, Field, FieldType } from '@grafana/data';
-import { WindTrailOptions, SpokeCount, SpeedUnit, DisplaySpeedUnit, LegendPosition } from '../types';
+import { WindTrailOptions, SpokeCount, SpeedUnit, DisplaySpeedUnit, LegendPosition, CurveMode } from '../types';
 import { css } from '@emotion/css';
 import { useStyles2, useTheme2 } from '@grafana/ui';
 
@@ -138,15 +138,59 @@ export const formatSpeed = (val: number, unitLabel: string, isBft: boolean): str
 
 interface Props extends PanelProps<WindTrailOptions> {}
 
-interface WindPoint {
+export interface WindPoint {
   index: number;
   time: number;
   dir: number; // degrees 0-360
   speed: number;
+  r: number;
   x: number;
   y: number;
   progress: number; // 0 (start) to 1 (end)
 }
+
+/**
+ * Generates an SVG path data string connecting two trajectory points.
+ * In 'polar' mode, it follows the circular compass arc using the shortest angular distance,
+ * while smoothly interpolating the radius to represent the drift of time.
+ * In 'linear' mode, it falls back to a straight Euclidean chord.
+ */
+export const buildSegmentPath = (
+  p1: { x: number; y: number; r: number; dir: number },
+  p2: { x: number; y: number; r: number; dir: number },
+  cx: number,
+  cy: number,
+  curveMode: CurveMode = 'polar'
+): string => {
+  if (curveMode === 'linear') {
+    return `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} L ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
+  }
+
+  // Calculate shortest angular difference on the compass (-180° to +180°)
+  let dDir = ((p2.dir - p1.dir + 180) % 360 + 360) % 360 - 180;
+  const absAngle = Math.abs(dDir);
+
+  // If points have almost identical angles (< 1°), a direct line segment is completely fine
+  if (absAngle < 1) {
+    return `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} L ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
+  }
+
+  // Sub-segment smooth steps: ~3° per step, minimum 3 steps, maximum 60 steps
+  const steps = Math.max(3, Math.min(60, Math.ceil(absAngle / 3)));
+  const parts: string[] = [`M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}`];
+
+  for (let s = 1; s <= steps; s++) {
+    const fraction = s / steps;
+    const curDir = p1.dir + dDir * fraction;
+    const curR = p1.r + (p2.r - p1.r) * fraction;
+    const rad = (curDir * Math.PI) / 180;
+    const x = cx + curR * Math.sin(rad);
+    const y = cy - curR * Math.cos(rad);
+    parts.push(`L ${x.toFixed(2)} ${y.toFixed(2)}`);
+  }
+
+  return parts.join(' ');
+};
 
 const CARDINALS_16 = [
   { label: 'N', deg: 0 },
@@ -556,6 +600,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
         time: p.time,
         dir: p.dir,
         speed: p.speed,
+        r,
         x,
         y,
         progress,
@@ -740,16 +785,17 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
             segmentStrokeWidth = Math.max(minW * 0.5, segmentStrokeWidth * timeTaper);
           }
 
+          const pathD = buildSegmentPath(prev, pt, cxVal, cyVal, options.curveMode ?? 'polar');
+
           return (
-            <line
+            <path
               key={`seg-${i}`}
-              x1={prev.x}
-              y1={prev.y}
-              x2={pt.x}
-              y2={pt.y}
+              d={pathD}
+              fill="none"
               stroke={strokeColor}
               strokeWidth={segmentStrokeWidth}
               strokeLinecap="round"
+              strokeLinejoin="round"
               strokeOpacity={strokeOpacity}
             />
           );

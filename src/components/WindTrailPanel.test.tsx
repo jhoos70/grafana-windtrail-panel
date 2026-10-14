@@ -1,6 +1,6 @@
 import React from 'react';
 import { render } from '@testing-library/react';
-import { WindTrailPanel, getCardinalLabel, convertSpeed } from './WindTrailPanel';
+import { WindTrailPanel, getCardinalLabel, convertSpeed, buildSegmentPath } from './WindTrailPanel';
 import { FieldType, LoadingState, toDataFrame } from '@grafana/data';
 import { WindTrailOptions } from '../types';
 
@@ -47,6 +47,41 @@ describe('WindTrailPanel', () => {
       expect(getCardinalLabel(22.4)).toBe('NNE');
       expect(getCardinalLabel(248)).toBe('WSW');
       expect(getCardinalLabel(-90)).toBe('W');
+    });
+  });
+
+  describe('buildSegmentPath', () => {
+    const cx = 200;
+    const cy = 200;
+
+    it('returns direct line when curveMode is linear', () => {
+      const p1 = { x: 200, y: 100, r: 100, dir: 0 };
+      const p2 = { x: 300, y: 200, r: 100, dir: 90 };
+      const path = buildSegmentPath(p1, p2, cx, cy, 'linear');
+      expect(path).toBe('M 200.00 100.00 L 300.00 200.00');
+    });
+
+    it('returns polar circular arc path when curveMode is polar', () => {
+      const p1 = { x: 200, y: 100, r: 100, dir: 0 };
+      const p2 = { x: 300, y: 200, r: 100, dir: 90 };
+      const path = buildSegmentPath(p1, p2, cx, cy, 'polar');
+      // Should have multiple L commands following the 90° arc
+      const segments = path.split(' L ');
+      expect(segments.length).toBeGreaterThan(5);
+      expect(path.startsWith('M 200.00 100.00')).toBe(true);
+      expect(path.endsWith('300.00 200.00')).toBe(true);
+    });
+
+    it('takes the shortest path across North (350° to 10°)', () => {
+      const rad1 = (350 * Math.PI) / 180;
+      const rad2 = (10 * Math.PI) / 180;
+      const p1 = { x: cx + 100 * Math.sin(rad1), y: cy - 100 * Math.cos(rad1), r: 100, dir: 350 };
+      const p2 = { x: cx + 100 * Math.sin(rad2), y: cy - 100 * Math.cos(rad2), r: 100, dir: 10 };
+      const path = buildSegmentPath(p1, p2, cx, cy, 'polar');
+      // For a 20° difference, should have around 7 steps, not 340 steps
+      const segments = path.split(' L ');
+      expect(segments.length).toBeLessThan(15);
+      expect(segments.length).toBeGreaterThan(2);
     });
   });
 
@@ -158,9 +193,11 @@ describe('WindTrailPanel', () => {
       expect(getByText(/270° \(W\)/i)).toBeInTheDocument();
       // Speed is 12.1 m/s
       expect(getByText(/12.1 m\/s/i)).toBeInTheDocument();
-      // Verify line elements are rendered
+      // Verify line elements (spokes) and path elements (trajectory arcs) are rendered
       const lines = container.querySelectorAll('line');
       expect(lines.length).toBeGreaterThan(0);
+      const paths = container.querySelectorAll('path');
+      expect(paths.length).toBeGreaterThan(0);
     });
 
     it('applies dashboard timeRange when timeRangeSource is dashboard', () => {

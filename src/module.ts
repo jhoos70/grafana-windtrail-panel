@@ -94,6 +94,22 @@ export const plugin = new PanelPlugin<WindTrailOptions>(WindTrailPanel).setPanel
         showIf: (config) => Boolean(config.fadeOverTime),
       })
 
+      // Trajectory Curve Interpolation
+      .addRadio({
+        category: ['Trail Styling'],
+        path: 'curveMode',
+        name: 'Trajectory curve',
+        description:
+          'Choose whether the wind trail follows the compass circle arc or connects points via straight chords',
+        defaultValue: 'polar',
+        settings: {
+          options: [
+            { value: 'polar', label: 'Follow compass arc (radial spiral with time drift)' },
+            { value: 'linear', label: 'Straight chords (direct Cartesian lines)' },
+          ],
+        },
+      })
+
       // 2. Line Thickness Controls
       .addBooleanSwitch({
         category: ['Trail Styling'],

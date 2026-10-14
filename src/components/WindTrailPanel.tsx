@@ -157,84 +157,39 @@ export interface WindPoint {
   progress: number; // 0 (start) to 1 (end)
 }
 
-export const catmullRom = (p0: number, p1: number, p2: number, p3: number, t: number): number => {
-  const t2 = t * t;
-  const t3 = t2 * t;
-  return (
-    0.5 *
-    (2 * p1 +
-      (-p0 + p2) * t +
-      (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
-      (-p0 + 3 * p1 - 3 * p2 + p3) * t3)
-  );
-};
-
-export interface SplineNeighbors {
-  prevPrevDir?: number;
-  nextDir?: number;
-  p1Unwrapped?: number;
-  p2Unwrapped?: number;
-}
-
 /**
  * Generates an SVG path data string connecting two trajectory points.
- * - 'smooth' (default): Continuous polar Catmull-Rom cubic spline. Smoothly connects points
- *   by bridging angle and radius simultaneously with continuous tangent velocity, eliminating
- *   angular kinks and discrete step artifacts.
- * - 'polar': Piecewise circular arc along the compass using shortest angular distance.
- * - 'linear': Direct straight Cartesian chord between points.
+ * In 'polar' mode (default), it follows the circular compass arc using the shortest angular distance,
+ * while smoothly interpolating the radius to represent the drift of time.
+ * In 'linear' mode, it falls back to a straight Euclidean chord.
  */
 export const buildSegmentPath = (
   p1: { x: number; y: number; r: number; dir: number },
   p2: { x: number; y: number; r: number; dir: number },
   cx: number,
   cy: number,
-  curveMode: CurveMode = 'smooth',
-  neighbors?: SplineNeighbors
+  curveMode: CurveMode = 'polar'
 ): string => {
   if (curveMode === 'linear') {
     return `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} L ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
   }
 
-  const d1 = neighbors?.p1Unwrapped ?? p1.dir;
-  const d2 =
-    neighbors?.p2Unwrapped ??
-    (p1.dir + (((p2.dir - p1.dir + 180) % 360 + 360) % 360 - 180));
-  const d0 = neighbors?.prevPrevDir ?? d1;
-  const d3 = neighbors?.nextDir ?? d2;
-
-  const dDir = d2 - d1;
+  // Calculate shortest angular difference on the compass (-180° to +180°)
+  let dDir = ((p2.dir - p1.dir + 180) % 360 + 360) % 360 - 180;
   const absAngle = Math.abs(dDir);
 
-  if (curveMode === 'smooth') {
-    // Number of steps based on angular sweep, minimum 4 steps, max 60
-    const steps = Math.max(4, Math.min(60, Math.ceil(Math.max(absAngle, 2) / 3)));
-    const parts: string[] = [`M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}`];
-
-    for (let s = 1; s <= steps; s++) {
-      const u = s / steps;
-      const curDir = catmullRom(d0, d1, d2, d3, u);
-      const curR = p1.r + (p2.r - p1.r) * u;
-      const rad = (curDir * Math.PI) / 180;
-      const x = cx + curR * Math.sin(rad);
-      const y = cy - curR * Math.cos(rad);
-      parts.push(`L ${x.toFixed(2)} ${y.toFixed(2)}`);
-    }
-
-    return parts.join(' ');
-  }
-
-  // Fallback 'polar': piecewise Archimedean spiral arc
+  // If points have almost identical angles (< 1°), a direct line segment is completely fine
   if (absAngle < 1) {
     return `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} L ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
   }
 
+  // Sub-segment smooth steps: ~3° per step, minimum 3 steps, maximum 60 steps
   const steps = Math.max(3, Math.min(60, Math.ceil(absAngle / 3)));
   const parts: string[] = [`M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}`];
 
   for (let s = 1; s <= steps; s++) {
     const fraction = s / steps;
-    const curDir = d1 + dDir * fraction;
+    const curDir = p1.dir + dDir * fraction;
     const curR = p1.r + (p2.r - p1.r) * fraction;
     const rad = (curDir * Math.PI) / 180;
     const x = cx + curR * Math.sin(rad);
@@ -733,20 +688,6 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
     });
   }, [points, tMin, tMax, options.timeDirection, minR, maxR, cxVal, cyVal]);
 
-  // Unwrapped angles for smooth continuous spline without 360° discontinuities
-  const unwrappedDirs = useMemo(() => {
-    if (projectedPoints.length === 0) {
-      return [];
-    }
-    const res: number[] = [projectedPoints[0].dir];
-    for (let i = 1; i < projectedPoints.length; i++) {
-      const prev = res[i - 1];
-      const cur = projectedPoints[i].dir;
-      const diff = ((cur - prev + 180) % 360 + 360) % 360 - 180;
-      res.push(prev + diff);
-    }
-    return res;
-  }, [projectedPoints]);
 
   if (points.length === 0) {
     return (
@@ -925,19 +866,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
             segmentStrokeWidth = Math.max(minW * 0.5, segmentStrokeWidth * timeTaper);
           }
 
-          const d0 = unwrappedDirs[Math.max(0, i - 2)];
-          const d1 = unwrappedDirs[i - 1];
-          const d2 = unwrappedDirs[i];
-          const d3 = unwrappedDirs[Math.min(unwrappedDirs.length - 1, i + 1)];
-
-          const pathD = buildSegmentPath(
-            prev,
-            pt,
-            cxVal,
-            cyVal,
-            options.curveMode ?? 'smooth',
-            { prevPrevDir: d0, nextDir: d3, p1Unwrapped: d1, p2Unwrapped: d2 }
-          );
+          const pathD = buildSegmentPath(prev, pt, cxVal, cyVal, options.curveMode ?? 'polar');
 
           return (
             <path

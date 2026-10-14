@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.3
+
+- **Reverted Spline Overshoot Artifacts**: Restored the clean piecewise polar Archimedean spiral arc (`curveMode: 'polar'`, now default). When wind direction stays constant between observations, the trajectory moves purely radially along that angle spoke, truthfully representing unchanging wind direction over time without z-shaped polynomial overshoot or artificial kinks.
+- **Removed Cubic Spline Artifacts**: Completely eliminated Runge's phenomenon and artificial overshoot around sudden direction shifts.
+
 ## 1.0.2
 
 - **Fixed Speed Range & Cross-Panel Comparability**: Added `speedScaleMode` option ('fixed', 'auto', 'custom') ensuring multiple panels share an identical, comparable color and legend scale regardless of query timeframe or transient extremes.

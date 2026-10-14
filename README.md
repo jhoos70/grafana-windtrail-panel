@@ -56,6 +56,7 @@ The panel works with any Grafana data source (Prometheus, InfluxDB, MySQL, Postg
 |                          | `minStrokeWidth`     | Minimum line width for calm wind (0.5 to 5 px)                                  |
 |                          | `maxStrokeWidth`     | Maximum line width for storm/gale wind (3 to 16 px)                             |
 |                          | `strokeWidth`        | Fixed line thickness (when variable thickness is disabled)                      |
+|                          | `curveMode`          | `polar` (follow compass arc with time drift) or `linear` (straight chords)      |
 |                          | `colorMode`          | `speed` (multi-color perceptual ramp) or `solid` (single customizable color)    |
 |                          | `colorPalette`       | `windy` (smooth Windy.com gradient) or `standard` (discrete weather bands)      |
 |                          | `solidColor`         | Custom color when `colorMode` is `solid`                                        |

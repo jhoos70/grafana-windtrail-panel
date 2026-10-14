@@ -1,6 +1,16 @@
 import React from 'react';
 import { render } from '@testing-library/react';
-import { WindTrailPanel, getCardinalLabel, convertSpeed, buildSegmentPath } from './WindTrailPanel';
+import {
+  WindTrailPanel,
+  getCardinalLabel,
+  convertSpeed,
+  buildSegmentPath,
+  interpolateColorStops,
+  getDefaultFixedSpeedMax,
+  getSpeedColor,
+  WINDY_COLOR_STOPS,
+  STANDARD_COLOR_STOPS,
+} from './WindTrailPanel';
 import { FieldType, LoadingState, toDataFrame } from '@grafana/data';
 import { WindTrailOptions } from '../types';
 
@@ -97,6 +107,49 @@ describe('WindTrailPanel', () => {
       expect(segments.length).toBeGreaterThan(5);
       expect(path.startsWith('M 200.00 100.00')).toBe(true);
       expect(path.endsWith('300.00 200.00')).toBe(true);
+    });
+  });
+
+  describe('getDefaultFixedSpeedMax', () => {
+    it('returns standard meteorological maximums for various speed units', () => {
+      expect(getDefaultFixedSpeedMax('km/h')).toBe(60);
+      expect(getDefaultFixedSpeedMax('knots')).toBe(40);
+      expect(getDefaultFixedSpeedMax('kn')).toBe(40);
+      expect(getDefaultFixedSpeedMax('mph')).toBe(45);
+      expect(getDefaultFixedSpeedMax('bft')).toBe(12);
+      expect(getDefaultFixedSpeedMax('ft/s')).toBe(60);
+      expect(getDefaultFixedSpeedMax('m/s')).toBe(20);
+      expect(getDefaultFixedSpeedMax('unknown')).toBe(20);
+    });
+  });
+
+  describe('interpolateColorStops and getSpeedColor', () => {
+    it('returns boundary colors correctly', () => {
+      expect(interpolateColorStops(0, WINDY_COLOR_STOPS)).toBe('rgb(56, 189, 248)');
+      expect(interpolateColorStops(1, WINDY_COLOR_STOPS)).toBe('rgb(236, 72, 153)');
+      expect(interpolateColorStops(-0.5, WINDY_COLOR_STOPS)).toBe('rgb(56, 189, 248)');
+      expect(interpolateColorStops(1.5, WINDY_COLOR_STOPS)).toBe('rgb(236, 72, 153)');
+
+      expect(interpolateColorStops(0, STANDARD_COLOR_STOPS)).toBe('rgb(56, 189, 248)');
+      expect(interpolateColorStops(1, STANDARD_COLOR_STOPS)).toBe('rgb(192, 132, 252)');
+    });
+
+    it('interpolates colors between stops', () => {
+      // Between stop 0 (0.0: [56, 189, 248]) and stop 1 (0.15: [16, 185, 129])
+      const color = interpolateColorStops(0.075, WINDY_COLOR_STOPS);
+      expect(color).toMatch(/^rgb\(\d+,\s*\d+,\s*\d+\)$/);
+    });
+
+    it('getSpeedColor scales speed across palette stops', () => {
+      const min = 0;
+      const max = 100;
+      // Windy palette: start is light sky blue, end is magenta
+      expect(getSpeedColor(0, min, max, 'windy')).toBe('rgb(56, 189, 248)');
+      expect(getSpeedColor(100, min, max, 'windy')).toBe('rgb(236, 72, 153)');
+
+      // Standard palette: start is cyan, end is purple
+      expect(getSpeedColor(0, min, max, 'standard')).toBe('rgb(56, 189, 248)');
+      expect(getSpeedColor(100, min, max, 'standard')).toBe('rgb(192, 132, 252)');
     });
   });
 
@@ -489,6 +542,7 @@ describe('WindTrailPanel', () => {
             legendPosition: 'bottom-right',
             scaleWidthBySpeed: true,
             colorMode: 'speed',
+            speedScaleMode: 'fixed',
           }}
           width={500}
           height={500}
@@ -506,10 +560,131 @@ describe('WindTrailPanel', () => {
 
       // Legend title
       expect(getByText(/Speed \(m\/s\)/i)).toBeInTheDocument();
-      // Legend max tick
-      expect(getByText(/15 m\/s/i)).toBeInTheDocument();
+      // Default fixed max for m/s is 20 m/s
+      expect(getByText(/20 m\/s/i)).toBeInTheDocument();
       // Polygon for thickness scale wedge
       expect(container.querySelector('polygon')).toBeInTheDocument();
+      // Windy gradient has 8 stops
+      const stops = container.querySelectorAll('linearGradient stop');
+      expect(stops.length).toBe(8);
+    });
+
+    it('renders dynamic bounds when speedScaleMode is auto', () => {
+      const now = Date.now();
+      const frame = toDataFrame({
+        fields: [
+          {
+            name: 'time',
+            type: FieldType.time,
+            values: [now - 1000, now],
+          },
+          {
+            name: 'wind_dir',
+            type: FieldType.number,
+            values: [180, 270],
+          },
+          {
+            name: 'wind_speed',
+            type: FieldType.number,
+            values: [2.5, 15.0],
+          },
+        ],
+      });
+
+      const { getByText } = render(
+        <WindTrailPanel
+          id={1}
+          data={{
+            series: [frame],
+            state: LoadingState.Done,
+            timeRange: {} as any,
+          }}
+          timeRange={{} as any}
+          onFieldConfigChange={jest.fn()}
+          options={{
+            ...defaultOptions,
+            showLegend: true,
+            colorMode: 'speed',
+            speedScaleMode: 'auto',
+          }}
+          width={500}
+          height={500}
+          fieldConfig={{} as any}
+          renderCounter={0}
+          title="Wind Trail"
+          transparent={false}
+          replaceVariables={(s) => s}
+          onOptionsChange={jest.fn()}
+          eventBus={{} as any}
+          timeZone="browser"
+          onChangeTimeRange={jest.fn()}
+        />
+      );
+
+      // In auto mode, scales to data max (15 m/s)
+      expect(getByText(/15 m\/s/i)).toBeInTheDocument();
+    });
+
+    it('renders custom bounds when fixedSpeedMax is provided', () => {
+      const now = Date.now();
+      const frame = toDataFrame({
+        fields: [
+          {
+            name: 'time',
+            type: FieldType.time,
+            values: [now - 1000, now],
+          },
+          {
+            name: 'wind_dir',
+            type: FieldType.number,
+            values: [180, 270],
+          },
+          {
+            name: 'wind_speed',
+            type: FieldType.number,
+            values: [2.5, 15.0],
+          },
+        ],
+      });
+
+      const { getByText, container } = render(
+        <WindTrailPanel
+          id={1}
+          data={{
+            series: [frame],
+            state: LoadingState.Done,
+            timeRange: {} as any,
+          }}
+          timeRange={{} as any}
+          onFieldConfigChange={jest.fn()}
+          options={{
+            ...defaultOptions,
+            showLegend: true,
+            colorMode: 'speed',
+            speedScaleMode: 'fixed',
+            fixedSpeedMax: 40,
+            colorPalette: 'standard',
+            scaleWidthBySpeed: true,
+          }}
+          width={500}
+          height={500}
+          fieldConfig={{} as any}
+          renderCounter={0}
+          title="Wind Trail"
+          transparent={false}
+          replaceVariables={(s) => s}
+          onOptionsChange={jest.fn()}
+          eventBus={{} as any}
+          timeZone="browser"
+          onChangeTimeRange={jest.fn()}
+        />
+      );
+
+      // Overridden max: 40 m/s
+      expect(getByText(/40 m\/s/i)).toBeInTheDocument();
+      // Standard palette has 6 stops
+      const stops = container.querySelectorAll('linearGradient stop');
+      expect(stops.length).toBe(6);
     });
   });
 });

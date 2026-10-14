@@ -1,6 +1,14 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef, useId } from 'react';
 import { PanelProps, dateTimeFormat, DataFrame, Field, FieldType } from '@grafana/data';
-import { WindTrailOptions, SpokeCount, SpeedUnit, DisplaySpeedUnit, LegendPosition, CurveMode } from '../types';
+import {
+  WindTrailOptions,
+  SpokeCount,
+  SpeedUnit,
+  DisplaySpeedUnit,
+  LegendPosition,
+  CurveMode,
+  ColorPalette,
+} from '../types';
 import { css } from '@emotion/css';
 import { useStyles2, useTheme2 } from '@grafana/ui';
 
@@ -262,27 +270,88 @@ export const getCardinalLabel = (deg: number): string => {
   return CARDINALS_16[index].label;
 };
 
-const getSpeedColor = (speed: number, minSpeed: number, maxSpeed: number): string => {
-  const span = Math.max(1, maxSpeed - minSpeed);
-  const ratio = Math.max(0, Math.min(1, (speed - minSpeed) / span));
+export interface ColorStop {
+  stop: number; // 0 to 1
+  color: [number, number, number];
+}
 
-  // Perceptual weather scale: Cyan -> Green -> Yellow -> Orange -> Crimson -> Purple
-  if (ratio < 0.2) {
-    return '#38bdf8';
-  } // light blue
-  if (ratio < 0.4) {
-    return '#22c55e';
-  } // green
-  if (ratio < 0.6) {
-    return '#eab308';
-  } // yellow
-  if (ratio < 0.8) {
-    return '#f97316';
-  } // orange
-  if (ratio < 0.95) {
-    return '#ef4444';
-  } // red
-  return '#c084fc'; // purple / storm
+// Authentic Windy.com smooth multi-color meteorological gradient
+export const WINDY_COLOR_STOPS: ColorStop[] = [
+  { stop: 0.0, color: [56, 189, 248] }, // #38bdf8 light sky blue (calm)
+  { stop: 0.15, color: [16, 185, 129] }, // #10b981 emerald green (light air)
+  { stop: 0.3, color: [132, 204, 22] }, // #84cc16 lime green (gentle breeze)
+  { stop: 0.45, color: [234, 179, 8] }, // #eab308 amber yellow (moderate)
+  { stop: 0.6, color: [249, 115, 22] }, // #f97316 orange (fresh breeze)
+  { stop: 0.75, color: [239, 68, 68] }, // #ef4444 vivid red (strong / near gale)
+  { stop: 0.9, color: [168, 85, 247] }, // #a855f7 purple / violet (gale / storm)
+  { stop: 1.0, color: [236, 72, 153] }, // #ec4899 magenta / hurricane
+];
+
+export const STANDARD_COLOR_STOPS: ColorStop[] = [
+  { stop: 0.0, color: [56, 189, 248] }, // cyan
+  { stop: 0.25, color: [34, 197, 94] }, // green
+  { stop: 0.5, color: [234, 179, 8] }, // yellow
+  { stop: 0.75, color: [249, 115, 22] }, // orange
+  { stop: 0.9, color: [239, 68, 68] }, // red
+  { stop: 1.0, color: [192, 132, 252] }, // purple
+];
+
+export const interpolateColorStops = (ratio: number, stops: ColorStop[] = WINDY_COLOR_STOPS): string => {
+  const r = Math.max(0, Math.min(1, ratio));
+  if (r <= stops[0].stop) {
+    const c = stops[0].color;
+    return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+  }
+  if (r >= stops[stops.length - 1].stop) {
+    const c = stops[stops.length - 1].color;
+    return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+  }
+
+  for (let i = 0; i < stops.length - 1; i++) {
+    const s1 = stops[i];
+    const s2 = stops[i + 1];
+    if (r >= s1.stop && r <= s2.stop) {
+      const t = (r - s1.stop) / (s2.stop - s1.stop);
+      const red = Math.round(s1.color[0] + t * (s2.color[0] - s1.color[0]));
+      const green = Math.round(s1.color[1] + t * (s2.color[1] - s1.color[1]));
+      const blue = Math.round(s1.color[2] + t * (s2.color[2] - s1.color[2]));
+      return `rgb(${red}, ${green}, ${blue})`;
+    }
+  }
+
+  return `rgb(${stops[0].color.join(',')})`;
+};
+
+export const getDefaultFixedSpeedMax = (unit: string): number => {
+  const u = unit.toLowerCase();
+  if (u === 'km/h') {
+    return 60;
+  }
+  if (u === 'kn' || u === 'knots') {
+    return 40;
+  }
+  if (u === 'mph') {
+    return 45;
+  }
+  if (u === 'bft') {
+    return 12;
+  }
+  if (u === 'ft/s') {
+    return 60;
+  }
+  return 20; // default for m/s
+};
+
+export const getSpeedColor = (
+  speed: number,
+  minSpeed: number,
+  maxSpeed: number,
+  palette: ColorPalette = 'windy'
+): string => {
+  const span = Math.max(0.1, maxSpeed - minSpeed);
+  const ratio = Math.max(0, Math.min(1, (speed - minSpeed) / span));
+  const stops = palette === 'standard' ? STANDARD_COLOR_STOPS : WINDY_COLOR_STOPS;
+  return interpolateColorStops(ratio, stops);
 };
 
 const formatRelativeTime = (timeDiffMs: number): string => {
@@ -409,6 +478,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
   const styles = useStyles2(getStyles);
   const containerRef = useRef<HTMLDivElement>(null);
   const [hoveredPoint, setHoveredPoint] = useState<WindPoint | null>(null);
+  const legendGradId = useId();
 
   // 1. Extract and process data
   const { points, tMin, tMax, minSpeed, maxSpeed, hasSpeed, speedUnit, isBft, latestPoint } = useMemo(() => {
@@ -564,26 +634,33 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
       }
     }
 
-    const cfgMin = speedField?.config?.min;
-    const cfgMax = speedField?.config?.max;
-    let minSpeed: number =
-      options.speedMin !== undefined ? options.speedMin : cfgMin != null ? Number(cfgMin) : Infinity;
-    let maxSpeed: number =
-      options.speedMax !== undefined ? options.speedMax : cfgMax != null ? Number(cfgMax) : -Infinity;
+    const speedScaleMode = options.speedScaleMode ?? 'fixed';
+    let minSpeed = 0;
+    let maxSpeed = 10;
 
-    for (const p of rawPoints) {
-      if (options.speedMin === undefined && cfgMin == null && p.speed < minSpeed) {
-        minSpeed = p.speed;
-      }
-      if (options.speedMax === undefined && cfgMax == null && p.speed > maxSpeed) {
-        maxSpeed = p.speed;
-      }
-    }
-    if (minSpeed === Infinity || isNaN(minSpeed)) {
+    if (speedScaleMode === 'fixed') {
       minSpeed = 0;
-    }
-    if (maxSpeed === -Infinity || isNaN(maxSpeed)) {
-      maxSpeed = 10;
+      maxSpeed = options.fixedSpeedMax ?? getDefaultFixedSpeedMax(effectiveUnit);
+    } else if (speedScaleMode === 'custom') {
+      minSpeed = options.speedMin ?? 0;
+      maxSpeed = options.speedMax ?? getDefaultFixedSpeedMax(effectiveUnit);
+    } else {
+      // 'auto' mode: data bounds
+      const cfgMin = speedField?.config?.min;
+      const cfgMax = speedField?.config?.max;
+      let dMin = options.speedMin !== undefined ? options.speedMin : cfgMin != null ? Number(cfgMin) : Infinity;
+      let dMax = options.speedMax !== undefined ? options.speedMax : cfgMax != null ? Number(cfgMax) : -Infinity;
+
+      for (const p of rawPoints) {
+        if (options.speedMin === undefined && cfgMin == null && p.speed < dMin) {
+          dMin = p.speed;
+        }
+        if (options.speedMax === undefined && cfgMax == null && p.speed > dMax) {
+          dMax = p.speed;
+        }
+      }
+      minSpeed = dMin === Infinity || isNaN(dMin) ? 0 : dMin;
+      maxSpeed = dMax === -Infinity || isNaN(dMax) ? 10 : dMax;
     }
 
     return {
@@ -603,11 +680,14 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
     options.directionFieldName,
     options.speedFieldName,
     options.timeRangeSource,
+    options.speedScaleMode,
+    options.fixedSpeedMax,
     options.speedMin,
     options.speedMax,
     options.inputSpeedUnit,
     options.displaySpeedUnit,
     options.speedUnit,
+    options.colorPalette,
     timeRange,
     replaceVariables,
   ]);
@@ -815,7 +895,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
           let strokeColor = options.solidColor || '#38bdf8';
           if (options.colorMode === 'speed' && hasSpeed) {
             const avgSpeed = (pt.speed + prev.speed) / 2;
-            strokeColor = getSpeedColor(avgSpeed, minSpeed, maxSpeed);
+            strokeColor = getSpeedColor(avgSpeed, minSpeed, maxSpeed, options.colorPalette ?? 'windy');
           } else {
             strokeColor = options.solidColor || '#38bdf8';
           }
@@ -883,7 +963,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
 
           let dotFill = options.solidColor || '#38bdf8';
           if (options.colorMode === 'speed' && hasSpeed) {
-            dotFill = getSpeedColor(pt.speed, minSpeed, maxSpeed);
+            dotFill = getSpeedColor(pt.speed, minSpeed, maxSpeed, options.colorPalette ?? 'windy');
           }
 
           let r = options.pointRadius ?? 2.5;
@@ -1012,42 +1092,49 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
             <span>{isBft ? 'Beaufort Scale (Bft)' : `Speed (${speedUnit})`}</span>
           </div>
           <div>
-            {options.scaleWidthBySpeed ? (
-              <svg width="120" height="14" style={{ display: 'block' }}>
-                <defs>
-                  <linearGradient id="scale-legend-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                    {options.colorMode === 'speed' ? (
-                      <>
-                        <stop offset="0%" stopColor="#38bdf8" />
-                        <stop offset="20%" stopColor="#22c55e" />
-                        <stop offset="45%" stopColor="#eab308" />
-                        <stop offset="70%" stopColor="#f97316" />
-                        <stop offset="90%" stopColor="#ef4444" />
-                        <stop offset="100%" stopColor="#c084fc" />
-                      </>
-                    ) : (
-                      <>
-                        <stop offset="0%" stopColor={options.solidColor || '#38bdf8'} />
-                        <stop offset="100%" stopColor={options.solidColor || '#38bdf8'} />
-                      </>
-                    )}
-                  </linearGradient>
-                </defs>
-                <polygon points="0,7 120,2 120,12 0,7" fill="url(#scale-legend-grad)" />
-              </svg>
-            ) : (
-              <div
-                style={{
-                  width: 120,
-                  height: 8,
-                  borderRadius: 4,
-                  background:
-                    options.colorMode === 'speed'
-                      ? 'linear-gradient(to right, #38bdf8 0%, #22c55e 20%, #eab308 45%, #f97316 70%, #ef4444 90%, #c084fc 100%)'
-                      : (options.solidColor || '#38bdf8'),
-                }}
-              />
-            )}
+            {(() => {
+              const isWindy = (options.colorPalette ?? 'windy') === 'windy';
+              const activeStops = isWindy ? WINDY_COLOR_STOPS : STANDARD_COLOR_STOPS;
+              const gradientCss = activeStops
+                .map((s) => `rgb(${s.color.join(',')}) ${Math.round(s.stop * 100)}%`)
+                .join(', ');
+
+              return options.scaleWidthBySpeed ? (
+                <svg width="120" height="14" style={{ display: 'block' }}>
+                  <defs>
+                    <linearGradient id={legendGradId} x1="0%" y1="0%" x2="100%" y2="0%">
+                      {options.colorMode === 'speed' ? (
+                        activeStops.map((s, idx) => (
+                          <stop
+                            key={idx}
+                            offset={`${Math.round(s.stop * 100)}%`}
+                            stopColor={`rgb(${s.color.join(',')})`}
+                          />
+                        ))
+                      ) : (
+                        <>
+                          <stop offset="0%" stopColor={options.solidColor || '#38bdf8'} />
+                          <stop offset="100%" stopColor={options.solidColor || '#38bdf8'} />
+                        </>
+                      )}
+                    </linearGradient>
+                  </defs>
+                  <polygon points="0,7 120,2 120,12 0,7" fill={`url(#${legendGradId})`} />
+                </svg>
+              ) : (
+                <div
+                  style={{
+                    width: 120,
+                    height: 8,
+                    borderRadius: 4,
+                    background:
+                      options.colorMode === 'speed'
+                        ? `linear-gradient(to right, ${gradientCss})`
+                        : options.solidColor || '#38bdf8',
+                  }}
+                />
+              );
+            })()}
             <div className={styles.legendTicks}>
               <span>{isBft ? Math.round(minSpeed) : minSpeed.toFixed(0)}</span>
               <span>{isBft ? Math.round((minSpeed + maxSpeed) / 2) : ((minSpeed + maxSpeed) / 2).toFixed(0)}</span>

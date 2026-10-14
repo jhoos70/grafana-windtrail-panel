@@ -3,6 +3,8 @@ export type TimeRangeSource = 'dashboard' | 'data';
 export type CurveMode = 'smooth' | 'polar' | 'linear';
 export type SpokeCount = 4 | 8 | 16;
 export type ColorMode = 'speed' | 'solid';
+export type SpeedScaleMode = 'auto' | 'fixed' | 'custom';
+export type ColorPalette = 'windy' | 'standard';
 export type SpeedUnit = 'auto' | 'm/s' | 'km/h' | 'knots' | 'mph' | 'ft/s' | (string & {});
 export type DisplaySpeedUnit = 'same' | 'm/s' | 'km/h' | 'knots' | 'mph' | 'bft' | 'ft/s' | (string & {});
 export type LegendPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'bottom-center';
@@ -33,6 +35,9 @@ export interface WindTrailOptions {
   inputSpeedUnit?: SpeedUnit;
   displaySpeedUnit?: DisplaySpeedUnit;
   speedUnit: string;
+  speedScaleMode?: SpeedScaleMode;
+  colorPalette?: ColorPalette;
+  fixedSpeedMax?: number;
   speedMin?: number;
   speedMax?: number;
   showLegend?: boolean;

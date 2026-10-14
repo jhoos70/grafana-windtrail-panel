@@ -57,6 +57,7 @@ The panel works with any Grafana data source (Prometheus, InfluxDB, MySQL, Postg
 |                          | `maxStrokeWidth`     | Maximum line width for storm/gale wind (3 to 16 px)                             |
 |                          | `strokeWidth`        | Fixed line thickness (when variable thickness is disabled)                      |
 |                          | `colorMode`          | `speed` (multi-color perceptual ramp) or `solid` (single customizable color)    |
+|                          | `colorPalette`       | `windy` (smooth Windy.com gradient) or `standard` (discrete weather bands)      |
 |                          | `solidColor`         | Custom color when `colorMode` is `solid`                                        |
 |                          | `showPoints`         | Toggle measurement dots along the trail                                         |
 |                          | `pointRadius`        | Base radius of data point dots                                                  |
@@ -67,8 +68,10 @@ The panel works with any Grafana data source (Prometheus, InfluxDB, MySQL, Postg
 |                          | `inputSpeedUnit`     | Unit of incoming speed data (`auto`, `m/s`, `km/h`, `knots`, `mph`, `ft/s`)     |
 |                          | `displaySpeedUnit`   | Target display unit (`same`, `m/s`, `km/h`, `knots`, `mph`, `bft`, `$var`)     |
 |                          | `speedUnit`          | Optional custom suffix override when `displaySpeedUnit` is `same`               |
-|                          | `speedMin`           | Manual lower bound for speed color & thickness scaling                          |
-|                          | `speedMax`           | Manual upper bound for speed color & thickness scaling                          |
+|                          | `speedScaleMode`     | `fixed` (meteorological standard range), `auto` (current data min/max), `custom`|
+|                          | `fixedSpeedMax`      | Optional upper bound override for fixed mode (e.g. 60 km/h, 20 m/s, 12 Bft)     |
+|                          | `speedMin`           | Manual lower bound for custom scale mode                                        |
+|                          | `speedMax`           | Manual upper bound for custom scale mode                                        |
 | **Legend**               | `showLegend`         | Toggle visual speed & thickness scale overlay legend                            |
 |                          | `legendPosition`     | Placement: `bottom-right`, `bottom-left`, `top-right`, or `bottom-center`       |
 

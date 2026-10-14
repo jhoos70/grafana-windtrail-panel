@@ -177,6 +177,20 @@ export const plugin = new PanelPlugin<WindTrailOptions>(WindTrailPanel).setPanel
           ],
         },
       })
+      .addRadio({
+        category: ['Trail Styling'],
+        path: 'colorPalette',
+        name: 'Speed color palette',
+        description: 'Color theme used for wind speed scale',
+        defaultValue: 'windy',
+        settings: {
+          options: [
+            { value: 'windy', label: 'Windy (Smooth blue-green-yellow-orange-red-purple)' },
+            { value: 'standard', label: 'Standard Weather (Discrete bands)' },
+          ],
+        },
+        showIf: (config) => config.colorMode === 'speed',
+      })
       .addColorPicker({
         category: ['Trail Styling'],
         path: 'solidColor',
@@ -278,19 +292,42 @@ export const plugin = new PanelPlugin<WindTrailOptions>(WindTrailPanel).setPanel
         defaultValue: '',
         showIf: (config) => config.displaySpeedUnit === 'same' || !config.displaySpeedUnit,
       })
+      .addRadio({
+        category: ['Field Mapping'],
+        path: 'speedScaleMode',
+        name: 'Speed scale & legend range',
+        description:
+          'Choose whether color & legend use a fixed meteorological range (for comparing multiple panels) or adapt to data',
+        defaultValue: 'fixed',
+        settings: {
+          options: [
+            { value: 'fixed', label: 'Fixed range (comparable across panels, e.g. 0-60 km/h or 0-12 Bft)' },
+            { value: 'auto', label: 'Dynamic (scales strictly to min & max speeds in current data)' },
+            { value: 'custom', label: 'Custom range (enter exact min & max below)' },
+          ],
+        },
+      })
+      .addNumberInput({
+        category: ['Field Mapping'],
+        path: 'fixedSpeedMax',
+        name: 'Fixed scale maximum override',
+        description:
+          'Optional override for the fixed upper bound (defaults: 60 km/h, 20 m/s, 40 kn, 12 Bft, 45 mph).',
+        showIf: (config) => config.speedScaleMode === 'fixed',
+      })
       .addNumberInput({
         category: ['Field Mapping'],
         path: 'speedMin',
-        name: 'Speed scale minimum',
-        description:
-          'Fixed lower bound for speed color and width scaling (e.g. 0). If left empty, auto-detected from data.',
+        name: 'Custom scale minimum',
+        description: 'Fixed lower bound for speed color and width scaling (e.g. 0).',
+        showIf: (config) => config.speedScaleMode === 'custom',
       })
       .addNumberInput({
         category: ['Field Mapping'],
         path: 'speedMax',
-        name: 'Speed scale maximum',
-        description:
-          'Fixed upper bound for speed color and width scaling (e.g. 25 m/s or 40 knots). If left empty, auto-detected from data.',
+        name: 'Custom scale maximum',
+        description: 'Fixed upper bound for speed color and width scaling (e.g. 50).',
+        showIf: (config) => config.speedScaleMode === 'custom',
       })
 
       // --- Legend ---

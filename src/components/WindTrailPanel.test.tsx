@@ -83,6 +83,21 @@ describe('WindTrailPanel', () => {
       expect(segments.length).toBeLessThan(15);
       expect(segments.length).toBeGreaterThan(2);
     });
+
+    it('returns continuous cubic spline arc when curveMode is smooth', () => {
+      const p1 = { x: 200, y: 100, r: 100, dir: 0 };
+      const p2 = { x: 300, y: 200, r: 100, dir: 90 };
+      const path = buildSegmentPath(p1, p2, cx, cy, 'smooth', {
+        prevPrevDir: 0,
+        nextDir: 90,
+        p1Unwrapped: 0,
+        p2Unwrapped: 90,
+      });
+      const segments = path.split(' L ');
+      expect(segments.length).toBeGreaterThan(5);
+      expect(path.startsWith('M 200.00 100.00')).toBe(true);
+      expect(path.endsWith('300.00 200.00')).toBe(true);
+    });
   });
 
   describe('Component rendering', () => {

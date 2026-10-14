@@ -100,11 +100,12 @@ export const plugin = new PanelPlugin<WindTrailOptions>(WindTrailPanel).setPanel
         path: 'curveMode',
         name: 'Trajectory curve',
         description:
-          'Choose whether the wind trail follows the compass circle arc or connects points via straight chords',
-        defaultValue: 'polar',
+          'Choose how the wind trail trajectory curves between data points over time',
+        defaultValue: 'smooth',
         settings: {
           options: [
-            { value: 'polar', label: 'Follow compass arc (radial spiral with time drift)' },
+            { value: 'smooth', label: 'Continuous smooth arc (cubic spline bridging time & angle)' },
+            { value: 'polar', label: 'Piecewise polar arc (radial spiral per segment)' },
             { value: 'linear', label: 'Straight chords (direct Cartesian lines)' },
           ],
         },

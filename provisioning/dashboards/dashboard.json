@@ -217,6 +217,23 @@
       ],
       "title": "Wind Direction Trail (16 Compass Spokes + Speed Scale)",
       "type": "tealwagon1458-windtrail-panel"
+    },
+    {
+      "datasource": {
+        "type": "grafana-testdata-datasource",
+        "uid": "trlxrdZVk"
+      },
+      "gridPos": {
+        "h": 14,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
+      "id": 5,
+      "options": {},
+      "targets": [],
+      "title": "Wind Direction Trail (Empty State)",
+      "type": "tealwagon1458-windtrail-panel"
     }
   ],
   "refresh": "",

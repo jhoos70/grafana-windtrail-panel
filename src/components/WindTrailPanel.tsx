@@ -959,7 +959,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
 
   if (points.length === 0) {
     return (
-      <div className={styles.container('overlay')}>
+      <div className={styles.container('overlay')} data-testid="windtrail-empty">
         <div className={styles.empty}>
           <div style={{ fontWeight: 600, marginBottom: 6 }}>No Wind Data Available</div>
           <div>Ensure your query returns a time field and a wind direction field in degrees (0–360°).</div>
@@ -1007,7 +1007,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
       .join(', ');
 
     return (
-      <div>
+      <div data-testid="windtrail-legend">
         <div className={styles.legendTitle}>
           <span>{isBft ? 'Beaufort Scale (Bft)' : `Speed (${speedUnit})`}</span>
         </div>
@@ -1062,7 +1062,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
       return null;
     }
     return (
-      <div className={styles.sidebarCard}>
+      <div className={styles.sidebarCard} data-testid="windtrail-current">
         <div className={styles.sidebarHeader}>
           <span
             style={{
@@ -1095,7 +1095,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
     }
     const isNarrow = width < 300;
     return (
-      <div className={styles.bottomCurrent}>
+      <div className={styles.bottomCurrent} data-testid="windtrail-current">
         <span
           style={{
             width: 7,
@@ -1124,7 +1124,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
       return null;
     }
     return (
-      <div className={styles.hud}>
+      <div className={styles.hud} data-testid="windtrail-current">
         <div className={styles.hudBadge}>
           <span
             style={{
@@ -1150,10 +1150,11 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
   };
 
   return (
-    <div className={styles.container(effectivePlacement)} ref={containerRef}>
+    <div className={styles.container(effectivePlacement)} ref={containerRef} data-testid="windtrail-panel">
       <div className={styles.compassWrapper} style={{ width: compassWidth, height: compassHeight }}>
         <svg
           className={styles.svg}
+          data-testid="windtrail-compass"
           width={compassWidth}
           height={compassHeight}
           onMouseLeave={() => setHoveredPoint(null)}

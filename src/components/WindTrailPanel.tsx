@@ -637,7 +637,7 @@ const getStyles = () => {
       margin-bottom: 2px;
       white-space: nowrap;
     `,
-    legendTicks: (ticksWidth: number = 120) => css`
+    legendTicks: (ticksWidth = 120) => css`
       display: flex;
       justify-content: space-between;
       width: ${ticksWidth}px;
@@ -867,7 +867,6 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
     options.inputSpeedUnit,
     options.displaySpeedUnit,
     options.speedUnit,
-    options.colorPalette,
     timeRange,
     replaceVariables,
   ]);

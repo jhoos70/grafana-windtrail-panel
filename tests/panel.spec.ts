@@ -26,6 +26,6 @@ test('should display "No Wind Data Available" when panel data is empty', async (
   const dashboard = await readProvisionedDashboard({ fileName: 'dashboard.json' });
   const panelEditPage = await gotoPanelEditPage({ dashboard, id: '5' });
   await expect(panelEditPage.panel.locator.getByTestId('windtrail-empty')).toBeVisible();
-  await expect(panelEditPage.panel.locator).toContainText('No Wind Data Available');
+  await expect(panelEditPage.panel.locator.getByTestId('windtrail-empty')).toContainText('No Wind Data Available');
 });
 

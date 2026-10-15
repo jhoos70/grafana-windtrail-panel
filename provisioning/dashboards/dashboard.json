@@ -231,7 +231,17 @@
       },
       "id": 5,
       "options": {},
-      "targets": [],
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-testdata-datasource",
+            "uid": "trlxrdZVk"
+          },
+          "refId": "A",
+          "scenarioId": "raw_frame",
+          "rawFrameContent": "[\n  {\n    \"columns\": [\n      {\n        \"text\": \"time\",\n        \"type\": \"time\"\n      },\n      {\n        \"text\": \"wind_direction\",\n        \"type\": \"number\"\n      }\n    ],\n    \"rows\": []\n  }\n]"
+        }
+      ],
       "title": "Wind Direction Trail (Empty State)",
       "type": "tealwagon1458-windtrail-panel"
     }

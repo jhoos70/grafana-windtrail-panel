@@ -61,11 +61,13 @@ The panel works with any Grafana data source (Prometheus, InfluxDB, MySQL, Postg
 |                          | `colorPalette`       | `windy` (smooth Windy.com gradient) or `standard` (discrete weather bands)      |
 |                          | `solidColor`         | Custom color when `colorMode` is `solid`                                        |
 |                          | `showPoints`         | Toggle measurement dots along the trail                                         |
+|                          | `autoHidePoints`     | Auto-hide intermediate dots when points > 80 to prevent visual clutter          |
 |                          | `pointRadius`        | Base radius of data point dots                                                  |
 | **Latest Marker**        | `showHeadMarker`     | Highlight the most recent wind direction with a glowing marker                  |
 |                          | `headMarkerColor`    | Accent color for the current wind direction marker (default: `#ef4444`)         |
 | **Field Mapping**        | `directionFieldName` | Explicitly choose direction field (or auto-detect from names/units)             |
 |                          | `speedFieldName`     | Explicitly choose speed field (or auto-detect from names/units)                 |
+|                          | `maxDataPoints`      | Max points limit using circular vector downsampling (default: 150, 0 = off)    |
 |                          | `inputSpeedUnit`     | Unit of incoming speed data (`auto`, `m/s`, `km/h`, `knots`, `mph`, `ft/s`)     |
 |                          | `displaySpeedUnit`   | Target display unit (`same`, `m/s`, `km/h`, `knots`, `mph`, `bft`, `$var`)     |
 |                          | `speedUnit`          | Optional custom suffix override when `displaySpeedUnit` is `same`               |

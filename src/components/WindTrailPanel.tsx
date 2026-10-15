@@ -144,6 +144,116 @@ export const formatSpeed = (val: number, unitLabel: string, isBft: boolean): str
   return `${val.toFixed(1)} ${unitLabel}`;
 };
 
+export interface RawWindPoint {
+  time: number;
+  dir: number; // degrees 0-360
+  speed: number;
+}
+
+/**
+ * Computes the circular vector mean direction for an array of angles (in degrees 0-360).
+ * Optionally weights each angle by its wind speed.
+ * Accurately handles wrapping across North (e.g. 350° and 10° -> 0° North).
+ */
+export const computeVectorAverageDirection = (
+  dirs: number[],
+  speeds?: number[]
+): number => {
+  if (dirs.length === 0) {
+    return 0;
+  }
+  let sumU = 0;
+  let sumV = 0;
+  for (let i = 0; i < dirs.length; i++) {
+    const rad = (dirs[i] * Math.PI) / 180;
+    const weight = speeds && speeds[i] != null && !isNaN(speeds[i]) && speeds[i] > 0 ? speeds[i] : 1;
+    sumU += Math.sin(rad) * weight;
+    sumV += Math.cos(rad) * weight;
+  }
+
+  if (Math.abs(sumU) < 1e-6 && Math.abs(sumV) < 1e-6) {
+    // If vectors cancel out completely, default to the last observed direction
+    return dirs[dirs.length - 1];
+  }
+
+  const rad = Math.atan2(sumU, sumV);
+  return ((rad * 180) / Math.PI + 360) % 360;
+};
+
+/**
+ * Downsamples an array of chronological wind observations into at most maxPoints buckets.
+ * Employs meteorological vector averaging for direction and arithmetic mean for speed.
+ * Guarantees that the final point in the returned array is the exact latest raw observation.
+ */
+export const downsamplePoints = (
+  rawPoints: RawWindPoint[],
+  maxPoints = 150
+): RawWindPoint[] => {
+  if (!maxPoints || maxPoints <= 0 || rawPoints.length <= maxPoints) {
+    return rawPoints;
+  }
+  if (rawPoints.length <= 2) {
+    return rawPoints;
+  }
+
+  const n = rawPoints.length;
+  const lastPoint = rawPoints[n - 1];
+  const firstPoint = rawPoints[0];
+  const span = lastPoint.time - firstPoint.time;
+
+  if (span <= 0) {
+    return [lastPoint];
+  }
+
+  // Reserve 1 slot for the exact latest observation
+  const targetBuckets = Math.max(1, maxPoints - 1);
+  const bucketWidth = span / targetBuckets;
+
+  const buckets: Array<{
+    times: number[];
+    dirs: number[];
+    speeds: number[];
+  }> = Array.from({ length: targetBuckets }, () => ({
+    times: [],
+    dirs: [],
+    speeds: [],
+  }));
+
+  // Bin all observations except the very last one
+  for (let i = 0; i < n - 1; i++) {
+    const p = rawPoints[i];
+    const bIdx = Math.min(
+      targetBuckets - 1,
+      Math.max(0, Math.floor((p.time - firstPoint.time) / bucketWidth))
+    );
+    buckets[bIdx].times.push(p.time);
+    buckets[bIdx].dirs.push(p.dir);
+    buckets[bIdx].speeds.push(p.speed);
+  }
+
+  const result: RawWindPoint[] = [];
+
+  for (const b of buckets) {
+    if (b.times.length === 0) {
+      continue;
+    }
+    const avgTime = Math.round(b.times.reduce((sum, t) => sum + t, 0) / b.times.length);
+    const avgSpeed = b.speeds.reduce((sum, s) => sum + s, 0) / b.speeds.length;
+    const avgDir = computeVectorAverageDirection(b.dirs, b.speeds);
+
+    result.push({
+      time: avgTime,
+      dir: avgDir,
+      speed: avgSpeed,
+    });
+  }
+
+  // Always append the exact latest observation
+  result.push(lastPoint);
+
+  return result;
+};
+
 interface Props extends PanelProps<WindTrailOptions> {}
 
 export interface WindPoint {
@@ -571,8 +681,12 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
       };
     }
 
+    const latestRaw = rawPoints[rawPoints.length - 1];
+    const effectiveMaxPoints = options.maxDataPoints ?? 150;
+    const finalPoints = downsamplePoints(rawPoints, effectiveMaxPoints);
+
     let tMin = rawPoints[0].time;
-    let tMax = rawPoints[rawPoints.length - 1].time;
+    let tMax = latestRaw.time;
 
     const useDashboardTime = (options.timeRangeSource ?? 'data') === 'dashboard';
     if (useDashboardTime && timeRange?.from && timeRange?.to && typeof timeRange.from.valueOf === 'function') {
@@ -580,7 +694,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
       const toMs = timeRange.to.valueOf();
       if (!isNaN(fromMs) && !isNaN(toMs) && toMs > fromMs) {
         const dataMin = rawPoints[0].time;
-        const dataMax = rawPoints[rawPoints.length - 1].time;
+        const dataMax = latestRaw.time;
         // Only use dashboard bounds if the data actually overlaps with the dashboard range
         if (dataMax >= fromMs && dataMin <= toMs) {
           tMin = fromMs;
@@ -619,7 +733,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
     }
 
     return {
-      points: rawPoints,
+      points: finalPoints,
       tMin,
       tMax,
       minSpeed,
@@ -628,12 +742,13 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
       speedField,
       speedUnit: effectiveUnit,
       isBft,
-      latestPoint: rawPoints[rawPoints.length - 1],
+      latestPoint: latestRaw,
     };
   }, [
     data,
     options.directionFieldName,
     options.speedFieldName,
+    options.maxDataPoints,
     options.timeRangeSource,
     options.speedScaleMode,
     options.fixedSpeedMax,
@@ -885,7 +1000,8 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
         {/* Data Point Dots (Interactive) */}
         {projectedPoints.map((pt, i) => {
           const isLatest = i === projectedPoints.length - 1;
-          const showDot = options.showPoints !== false || isLatest;
+          const isDense = options.autoHidePoints !== false && projectedPoints.length > 80;
+          const showDot = isLatest || (options.showPoints !== false && !isDense);
           if (!showDot) {
             return null;
           }

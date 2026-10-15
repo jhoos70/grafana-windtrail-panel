@@ -25,6 +25,7 @@ export interface WindTrailOptions {
   colorMode: ColorMode;
   solidColor: string;
   showPoints: boolean;
+  autoHidePoints?: boolean;
   pointRadius: number;
   showHeadMarker: boolean;
   headMarkerColor: string;
@@ -32,6 +33,7 @@ export interface WindTrailOptions {
   showCardinalLabels: boolean;
   directionFieldName?: string;
   speedFieldName?: string;
+  maxDataPoints?: number;
   inputSpeedUnit?: SpeedUnit;
   displaySpeedUnit?: DisplaySpeedUnit;
   speedUnit: string;

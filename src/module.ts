@@ -203,6 +203,15 @@ export const plugin = new PanelPlugin<WindTrailOptions>(WindTrailPanel).setPanel
         name: 'Show data points',
         defaultValue: true,
       })
+      .addBooleanSwitch({
+        category: ['Trail Styling'],
+        path: 'autoHidePoints',
+        name: 'Auto-hide dots when dense',
+        description:
+          'Automatically hides intermediate measurement dots when there are many points to keep the chart clean',
+        defaultValue: true,
+        showIf: (config) => config.showPoints,
+      })
       .addSliderInput({
         category: ['Trail Styling'],
         path: 'pointRadius',
@@ -244,6 +253,14 @@ export const plugin = new PanelPlugin<WindTrailOptions>(WindTrailPanel).setPanel
         path: 'speedFieldName',
         name: 'Wind speed field',
         description: 'Optional field containing wind speed. Used for coloring and tooltips.',
+      })
+      .addNumberInput({
+        category: ['Field Mapping'],
+        path: 'maxDataPoints',
+        name: 'Max points limit (vector downsampling)',
+        description:
+          'Maximum number of trajectory points to display (default: 150). When data exceeds this limit, points are downsampled using circular vector averaging. Set to 0 to disable.',
+        defaultValue: 150,
       })
       .addSelect({
         category: ['Field Mapping'],

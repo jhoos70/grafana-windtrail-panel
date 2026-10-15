@@ -10,6 +10,9 @@ import {
   getSpeedColor,
   WINDY_COLOR_STOPS,
   STANDARD_COLOR_STOPS,
+  computeVectorAverageDirection,
+  downsamplePoints,
+  RawWindPoint,
 } from './WindTrailPanel';
 import { FieldType, LoadingState, toDataFrame } from '@grafana/data';
 import { WindTrailOptions } from '../types';
@@ -143,6 +146,93 @@ describe('WindTrailPanel', () => {
       // Standard palette: start is cyan, end is purple
       expect(getSpeedColor(0, min, max, 'standard')).toBe('rgb(56, 189, 248)');
       expect(getSpeedColor(100, min, max, 'standard')).toBe('rgb(192, 132, 252)');
+    });
+  });
+
+  describe('computeVectorAverageDirection', () => {
+    it('correctly averages angles across North boundary without inverted results', () => {
+      // 350° (-10°) and 10° (+10°) -> should average to 0° (North), NOT 180° (South)
+      const avg = computeVectorAverageDirection([350, 10]);
+      expect(avg).toBeCloseTo(0, 1);
+    });
+
+    it('correctly averages perpendicular angles', () => {
+      // 90° (East) and 180° (South) -> 135° (South-East)
+      const avg = computeVectorAverageDirection([90, 180]);
+      expect(avg).toBeCloseTo(135, 1);
+    });
+
+    it('weights direction by speed when speeds are supplied', () => {
+      // Strong wind from North (0° at 30 m/s) with light puff from East (90° at 1 m/s)
+      const avg = computeVectorAverageDirection([0, 90], [30, 1]);
+      // Should be very close to North (~1.9°)
+      expect(avg).toBeLessThan(5);
+      expect(avg).toBeGreaterThanOrEqual(0);
+    });
+
+    it('handles cancellation and empty array gracefully', () => {
+      expect(computeVectorAverageDirection([])).toBe(0);
+      // Equal opposite vectors 0° and 180° -> falls back to last observed
+      expect(computeVectorAverageDirection([0, 180], [10, 10])).toBe(180);
+    });
+  });
+
+  describe('downsamplePoints', () => {
+    it('does not downsample if count is <= maxPoints', () => {
+      const pts: RawWindPoint[] = [
+        { time: 1000, dir: 45, speed: 5 },
+        { time: 2000, dir: 90, speed: 6 },
+        { time: 3000, dir: 135, speed: 7 },
+      ];
+      expect(downsamplePoints(pts, 10)).toEqual(pts);
+    });
+
+    it('does not downsample if maxPoints is 0 or negative (disabled)', () => {
+      const pts: RawWindPoint[] = Array.from({ length: 50 }, (_, i) => ({
+        time: 1000 + i * 10,
+        dir: i * 5,
+        speed: 5,
+      }));
+      expect(downsamplePoints(pts, 0)).toHaveLength(50);
+      expect(downsamplePoints(pts, -1)).toHaveLength(50);
+    });
+
+    it('downsamples large dataset to <= maxPoints and preserves exact latest point', () => {
+      const pts: RawWindPoint[] = Array.from({ length: 300 }, (_, i) => ({
+        time: 1000 + i * 60000, // 300 minutes
+        dir: (i * 12) % 360,
+        speed: 5 + (i % 10),
+      }));
+
+      const downsampled = downsamplePoints(pts, 50);
+      expect(downsampled.length).toBeLessThanOrEqual(50);
+      expect(downsampled.length).toBeGreaterThan(10);
+
+      // Latest point MUST match the exact raw latest point
+      const lastDown = downsampled[downsampled.length - 1];
+      const lastRaw = pts[pts.length - 1];
+      expect(lastDown.time).toBe(lastRaw.time);
+      expect(lastDown.dir).toBe(lastRaw.dir);
+      expect(lastDown.speed).toBe(lastRaw.speed);
+
+      // Timestamps must remain strictly ascending
+      for (let i = 1; i < downsampled.length; i++) {
+        expect(downsampled[i].time).toBeGreaterThan(downsampled[i - 1].time);
+      }
+    });
+
+    it('accurately vector-averages points across North within bins', () => {
+      const now = Date.now();
+      const pts: RawWindPoint[] = [
+        { time: now, dir: 350, speed: 10 },
+        { time: now + 100, dir: 10, speed: 10 },
+        { time: now + 10000, dir: 90, speed: 12 }, // Last point
+      ];
+      // Downsample 3 points into 2 points (bucket 1 = points 0 & 1, point 2 = exact latest)
+      const downsampled = downsamplePoints(pts, 2);
+      expect(downsampled).toHaveLength(2);
+      expect(downsampled[0].dir).toBeCloseTo(0, 1); // 350° and 10° vector mean = 0° (North)
+      expect(downsampled[1].dir).toBe(90);
     });
   });
 
@@ -678,6 +768,156 @@ describe('WindTrailPanel', () => {
       // Standard palette has 6 stops
       const stops = container.querySelectorAll('linearGradient stop');
       expect(stops.length).toBe(6);
+    });
+
+    it('downsamples data points according to maxDataPoints in component rendering', () => {
+      const now = Date.now();
+      const count = 200;
+      const frame = toDataFrame({
+        fields: [
+          {
+            name: 'time',
+            type: FieldType.time,
+            values: Array.from({ length: count }, (_, i) => now - (count - i) * 10000),
+          },
+          {
+            name: 'wind_dir',
+            type: FieldType.number,
+            values: Array.from({ length: count }, (_, i) => (i * 10) % 360),
+          },
+          {
+            name: 'wind_speed',
+            type: FieldType.number,
+            values: Array.from({ length: count }, (_, i) => 5 + (i % 5)),
+          },
+        ],
+      });
+
+      const { container } = render(
+        <WindTrailPanel
+          id={1}
+          data={{
+            series: [frame],
+            state: LoadingState.Done,
+            timeRange: {} as any,
+          }}
+          timeRange={{} as any}
+          onFieldConfigChange={jest.fn()}
+          options={{
+            ...defaultOptions,
+            maxDataPoints: 25,
+          }}
+          width={500}
+          height={500}
+          fieldConfig={{} as any}
+          renderCounter={0}
+          title="Wind Trail"
+          transparent={false}
+          replaceVariables={(s) => s}
+          onOptionsChange={jest.fn()}
+          eventBus={{} as any}
+          timeZone="browser"
+          onChangeTimeRange={jest.fn()}
+        />
+      );
+
+      // Trajectory segments count should be <= 25
+      const segments = container.querySelectorAll('path[stroke]');
+      expect(segments.length).toBeLessThanOrEqual(25);
+      expect(segments.length).toBeGreaterThan(5);
+    });
+
+    it('auto-hides intermediate dots when point count is dense', () => {
+      const now = Date.now();
+      const count = 90; // > 80 threshold
+      const frame = toDataFrame({
+        fields: [
+          {
+            name: 'time',
+            type: FieldType.time,
+            values: Array.from({ length: count }, (_, i) => now - (count - i) * 10000),
+          },
+          {
+            name: 'wind_dir',
+            type: FieldType.number,
+            values: Array.from({ length: count }, (_, i) => (i * 10) % 360),
+          },
+          {
+            name: 'wind_speed',
+            type: FieldType.number,
+            values: Array.from({ length: count }, () => 10),
+          },
+        ],
+      });
+
+      // 1. With autoHidePoints: true (default)
+      const { container: containerHidden } = render(
+        <WindTrailPanel
+          id={1}
+          data={{
+            series: [frame],
+            state: LoadingState.Done,
+            timeRange: {} as any,
+          }}
+          timeRange={{} as any}
+          onFieldConfigChange={jest.fn()}
+          options={{
+            ...defaultOptions,
+            maxDataPoints: 0, // Keep all 90 points
+            showPoints: true,
+            autoHidePoints: true,
+          }}
+          width={500}
+          height={500}
+          fieldConfig={{} as any}
+          renderCounter={0}
+          title="Wind Trail"
+          transparent={false}
+          replaceVariables={(s) => s}
+          onOptionsChange={jest.fn()}
+          eventBus={{} as any}
+          timeZone="browser"
+          onChangeTimeRange={jest.fn()}
+        />
+      );
+
+      // Intermediate dots should be suppressed (only latest point dot + head marker circles rendered)
+      const circlesHidden = containerHidden.querySelectorAll('circle');
+      expect(circlesHidden.length).toBeLessThan(10);
+
+      // 2. With autoHidePoints: false, all 90 dots should be rendered
+      const { container: containerVisible } = render(
+        <WindTrailPanel
+          id={2}
+          data={{
+            series: [frame],
+            state: LoadingState.Done,
+            timeRange: {} as any,
+          }}
+          timeRange={{} as any}
+          onFieldConfigChange={jest.fn()}
+          options={{
+            ...defaultOptions,
+            maxDataPoints: 0,
+            showPoints: true,
+            autoHidePoints: false,
+          }}
+          width={500}
+          height={500}
+          fieldConfig={{} as any}
+          renderCounter={0}
+          title="Wind Trail"
+          transparent={false}
+          replaceVariables={(s) => s}
+          onOptionsChange={jest.fn()}
+          eventBus={{} as any}
+          timeZone="browser"
+          onChangeTimeRange={jest.fn()}
+        />
+      );
+
+      const circlesVisible = containerVisible.querySelectorAll('circle');
+      expect(circlesVisible.length).toBeGreaterThanOrEqual(90);
     });
   });
 });

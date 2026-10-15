@@ -6,6 +6,7 @@ import {
   SpeedUnit,
   DisplaySpeedUnit,
   LegendPosition,
+  InfoPlacement,
   CurveMode,
   ColorPalette,
 } from '../types';
@@ -438,15 +439,38 @@ const formatRelativeTime = (timeDiffMs: number): string => {
 
 const getStyles = () => {
   return {
-    container: css`
+    container: (placement: 'right' | 'bottom' | 'overlay' = 'overlay') => {
+      let flexDir = 'row';
+      let align = 'center';
+      let justify = 'center';
+      if (placement === 'right') {
+        flexDir = 'row';
+        align = 'stretch';
+        justify = 'flex-start';
+      } else if (placement === 'bottom') {
+        flexDir = 'column';
+        align = 'center';
+        justify = 'flex-start';
+      }
+      return css`
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        display: flex;
+        flex-direction: ${flexDir};
+        align-items: ${align};
+        justify-content: ${justify};
+        user-select: none;
+      `;
+    },
+    compassWrapper: css`
       position: relative;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
       display: flex;
       align-items: center;
       justify-content: center;
-      user-select: none;
+      overflow: hidden;
+      flex-shrink: 0;
     `,
     svg: css`
       display: block;
@@ -460,6 +484,7 @@ const getStyles = () => {
       flex-direction: column;
       gap: 3px;
       font-size: 12px;
+      z-index: 10;
     `,
     hudBadge: css`
       font-weight: 600;
@@ -471,6 +496,90 @@ const getStyles = () => {
       align-items: center;
       gap: 6px;
       width: fit-content;
+    `,
+    sidebar: css`
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 10px;
+      height: 100%;
+      padding: 10px 12px;
+      box-sizing: border-box;
+      overflow-y: auto;
+      border-left: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(0, 0, 0, 0.18);
+      backdrop-filter: blur(4px);
+      z-index: 5;
+      flex-shrink: 0;
+    `,
+    sidebarCard: css`
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    `,
+    sidebarHeader: css`
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: rgba(255, 255, 255, 0.65);
+    `,
+    sidebarDir: css`
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #ffffff;
+    `,
+    cardinalBadge: css`
+      font-size: 11px;
+      font-weight: 600;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.12);
+      color: #38bdf8;
+    `,
+    sidebarSpeed: css`
+      font-size: 13px;
+      font-weight: 600;
+      color: #4ade80;
+    `,
+    bottomBar: css`
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 4px 12px;
+      box-sizing: border-box;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(4px);
+      z-index: 5;
+      gap: 12px;
+      flex-shrink: 0;
+    `,
+    bottomCurrent: css`
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.85);
+      white-space: nowrap;
+    `,
+    bottomLegend: css`
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
     `,
     tooltip: css`
       position: absolute;
@@ -526,11 +635,12 @@ const getStyles = () => {
       font-weight: 600;
       color: rgba(255, 255, 255, 0.85);
       margin-bottom: 2px;
+      white-space: nowrap;
     `,
-    legendTicks: css`
+    legendTicks: (ticksWidth: number = 120) => css`
       display: flex;
       justify-content: space-between;
-      width: 120px;
+      width: ${ticksWidth}px;
       font-size: 9px;
       color: rgba(255, 255, 255, 0.65);
       margin-top: 2px;
@@ -762,11 +872,55 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
     replaceVariables,
   ]);
 
-  // 2. Geometry calculations
-  const size = Math.min(width, height);
-  const cxVal = width / 2;
-  const cyVal = height / 2;
-  const padding = options.showCardinalLabels ? 28 : 16;
+  // 2. Geometry calculations & responsive layout
+  const hasCurrentInfo = options.showCurrent !== false && Boolean(latestPoint);
+  const hasLegendInfo = Boolean(options.showLegend) && hasSpeed;
+  const hasAnyInfo = hasCurrentInfo || hasLegendInfo;
+
+  const requestedPlacement: InfoPlacement = options.infoPlacement ?? 'auto';
+  let effectivePlacement: 'right' | 'bottom' | 'overlay' =
+    requestedPlacement === 'auto' ? 'overlay' : requestedPlacement;
+
+  if (!hasAnyInfo) {
+    effectivePlacement = 'overlay';
+  } else if (requestedPlacement === 'auto') {
+    // 1. Wide panel: Right sidebar mode (Compass left, Info right)
+    const isWide = width >= 320 && (width - height >= 60 || width / height >= 1.22);
+    if (isWide) {
+      effectivePlacement = 'right';
+    } else if (hasLegendInfo) {
+      // 2. Square, portrait, or compact with legend: Bottom bar mode
+      // Guarantees scale legend never overlaps the compass rose or wind trail
+      effectivePlacement = 'bottom';
+    } else {
+      effectivePlacement = 'overlay';
+    }
+  }
+
+  // Calculate compass area and sidebar/bottom dimensions
+  let compassWidth = width;
+  let compassHeight = height;
+  let sidebarWidth = 0;
+  let bottomBarHeight = 0;
+
+  if (hasAnyInfo && effectivePlacement === 'right') {
+    sidebarWidth = Math.min(160, Math.max(130, Math.floor(width * 0.3)));
+    if (width - sidebarWidth < 180 && width > 260) {
+      sidebarWidth = Math.max(100, width - 180);
+    }
+    compassWidth = Math.max(50, width - sidebarWidth);
+    compassHeight = height;
+  } else if (hasAnyInfo && effectivePlacement === 'bottom') {
+    bottomBarHeight = hasLegendInfo && hasCurrentInfo ? (width < 280 ? 42 : 46) : 38;
+    compassWidth = width;
+    compassHeight = Math.max(50, height - bottomBarHeight);
+  }
+
+  const size = Math.min(compassWidth, compassHeight);
+  const cxVal = compassWidth / 2;
+  const cyVal = compassHeight / 2;
+  const isSmall = size < 260;
+  const padding = options.showCardinalLabels ? (isSmall ? 18 : 28) : (isSmall ? 10 : 16);
   const maxR = Math.max(10, size / 2 - padding);
   const minR = 6; // small central deadzone for clarity
 
@@ -806,7 +960,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
 
   if (points.length === 0) {
     return (
-      <div className={styles.container}>
+      <div className={styles.container('overlay')}>
         <div className={styles.empty}>
           <div style={{ fontWeight: 600, marginBottom: 6 }}>No Wind Data Available</div>
           <div>Ensure your query returns a time field and a wind direction field in degrees (0–360°).</div>
@@ -842,9 +996,169 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
 
   const latestProjected = projectedPoints[projectedPoints.length - 1];
 
+  const renderLegend = (barWidth: number) => {
+    if (!hasLegendInfo) {
+      return null;
+    }
+
+    const isWindy = (options.colorPalette ?? 'windy') === 'windy';
+    const activeStops = isWindy ? WINDY_COLOR_STOPS : STANDARD_COLOR_STOPS;
+    const gradientCss = activeStops
+      .map((s) => `rgb(${s.color.join(',')}) ${Math.round(s.stop * 100)}%`)
+      .join(', ');
+
+    return (
+      <div>
+        <div className={styles.legendTitle}>
+          <span>{isBft ? 'Beaufort Scale (Bft)' : `Speed (${speedUnit})`}</span>
+        </div>
+        <div>
+          {options.scaleWidthBySpeed ? (
+            <svg width={barWidth} height="14" style={{ display: 'block' }}>
+              <defs>
+                <linearGradient id={legendGradId} x1="0%" y1="0%" x2="100%" y2="0%">
+                  {options.colorMode === 'speed' ? (
+                    activeStops.map((s, idx) => (
+                      <stop
+                        key={idx}
+                        offset={`${Math.round(s.stop * 100)}%`}
+                        stopColor={`rgb(${s.color.join(',')})`}
+                      />
+                    ))
+                  ) : (
+                    <>
+                      <stop offset="0%" stopColor={options.solidColor || '#38bdf8'} />
+                      <stop offset="100%" stopColor={options.solidColor || '#38bdf8'} />
+                    </>
+                  )}
+                </linearGradient>
+              </defs>
+              <polygon points={`0,7 ${barWidth},2 ${barWidth},12 0,7`} fill={`url(#${legendGradId})`} />
+            </svg>
+          ) : (
+            <div
+              style={{
+                width: barWidth,
+                height: 8,
+                borderRadius: 4,
+                background:
+                  options.colorMode === 'speed'
+                    ? `linear-gradient(to right, ${gradientCss})`
+                    : options.solidColor || '#38bdf8',
+              }}
+            />
+          )}
+          <div className={styles.legendTicks(barWidth)}>
+            <span>{isBft ? Math.round(minSpeed) : minSpeed.toFixed(0)}</span>
+            <span>{isBft ? Math.round((minSpeed + maxSpeed) / 2) : ((minSpeed + maxSpeed) / 2).toFixed(0)}</span>
+            <span>{isBft ? `${Math.round(maxSpeed)} Bft` : `${maxSpeed.toFixed(0)} ${speedUnit}`}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCurrentSidebar = () => {
+    if (!hasCurrentInfo || !latestPoint) {
+      return null;
+    }
+    return (
+      <div className={styles.sidebarCard}>
+        <div className={styles.sidebarHeader}>
+          <span
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              backgroundColor: options.headMarkerColor || '#ef4444',
+              display: 'inline-block',
+              boxShadow: `0 0 6px ${options.headMarkerColor || '#ef4444'}`,
+            }}
+          />
+          <span>Current Wind</span>
+        </div>
+        <div className={styles.sidebarDir}>
+          <span>{Math.round(latestPoint.dir)}°</span>
+          <span className={styles.cardinalBadge}>{getCardinalLabel(latestPoint.dir)}</span>
+        </div>
+        {hasSpeed && (
+          <div className={styles.sidebarSpeed}>
+            {formatSpeed(latestPoint.speed, speedUnit, isBft)}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderCurrentBottom = () => {
+    if (!hasCurrentInfo || !latestPoint) {
+      return null;
+    }
+    const isNarrow = width < 300;
+    return (
+      <div className={styles.bottomCurrent}>
+        <span
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: '50%',
+            backgroundColor: options.headMarkerColor || '#ef4444',
+            display: 'inline-block',
+            flexShrink: 0,
+          }}
+        />
+        {!isNarrow && <span>Current:</span>}
+        <strong style={{ color: theme.colors.text.primary, whiteSpace: 'nowrap' }}>
+          {Math.round(latestPoint.dir)}° ({getCardinalLabel(latestPoint.dir)})
+        </strong>
+        {hasSpeed && (
+          <span style={{ color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>
+            {formatSpeed(latestPoint.speed, speedUnit, isBft)}
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  const renderCurrentOverlay = () => {
+    if (!hasCurrentInfo || !latestPoint) {
+      return null;
+    }
+    return (
+      <div className={styles.hud}>
+        <div className={styles.hudBadge}>
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              backgroundColor: options.headMarkerColor || '#ef4444',
+              display: 'inline-block',
+            }}
+          />
+          <span>Current:</span>
+          <span style={{ color: theme.colors.text.primary }}>
+            {Math.round(latestPoint.dir)}° ({getCardinalLabel(latestPoint.dir)})
+          </span>
+          {hasSpeed && (
+            <span style={{ color: theme.colors.text.secondary }}>
+              {formatSpeed(latestPoint.speed, speedUnit, isBft)}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className={styles.container} ref={containerRef}>
-      <svg className={styles.svg} width={width} height={height} onMouseLeave={() => setHoveredPoint(null)}>
+    <div className={styles.container(effectivePlacement)} ref={containerRef}>
+      <div className={styles.compassWrapper} style={{ width: compassWidth, height: compassHeight }}>
+        <svg
+          className={styles.svg}
+          width={compassWidth}
+          height={compassHeight}
+          onMouseLeave={() => setHoveredPoint(null)}
+        >
         <defs>
           {/* Radial subtle backdrop gradient */}
           <radialGradient id="compass-bg" cx="50%" cy="50%" r="50%">
@@ -909,9 +1223,9 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
           const y2 = cyVal - maxR * Math.cos(rad);
           const isMajor = spoke.deg % 90 === 0;
 
-          const labelOffset = maxR + 13;
+          const labelOffset = maxR + (isSmall ? 9 : 13);
           const lx = cxVal + labelOffset * Math.sin(rad);
-          const ly = cyVal - labelOffset * Math.cos(rad) + 4;
+          const ly = cyVal - labelOffset * Math.cos(rad) + (isSmall ? 3 : 4);
 
           return (
             <g key={spoke.label}>
@@ -930,7 +1244,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
                   y={ly}
                   fill={isMajor ? theme.colors.text.primary : theme.colors.text.secondary}
                   fontWeight={isMajor ? 600 : 400}
-                  fontSize={isMajor ? 11 : 9}
+                  fontSize={isMajor ? (isSmall ? 10 : 11) : isSmall ? 8 : 9}
                   textAnchor="middle"
                 >
                   {spoke.label}
@@ -1077,32 +1391,6 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
         )}
       </svg>
 
-      {/* Realtime Head-Up Display (Current Wind Direction & Speed) */}
-      {latestPoint && (
-        <div className={styles.hud}>
-          <div className={styles.hudBadge}>
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                backgroundColor: options.headMarkerColor || '#ef4444',
-                display: 'inline-block',
-              }}
-            />
-            <span>Current:</span>
-            <span style={{ color: theme.colors.text.primary }}>
-              {Math.round(latestPoint.dir)}° ({getCardinalLabel(latestPoint.dir)})
-            </span>
-            {hasSpeed && (
-              <span style={{ color: theme.colors.text.secondary }}>
-                {formatSpeed(latestPoint.speed, speedUnit, isBft)}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Hover Tooltip */}
       {hoveredPoint && (
         <div
@@ -1130,62 +1418,40 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
         </div>
       )}
 
-      {/* Optional Wind Speed & Thickness Scale Legend */}
-      {options.showLegend && hasSpeed && (
-        <div className={styles.legendContainer(options.legendPosition ?? 'bottom-right')}>
-          <div className={styles.legendTitle}>
-            <span>{isBft ? 'Beaufort Scale (Bft)' : `Speed (${speedUnit})`}</span>
-          </div>
-          <div>
-            {(() => {
-              const isWindy = (options.colorPalette ?? 'windy') === 'windy';
-              const activeStops = isWindy ? WINDY_COLOR_STOPS : STANDARD_COLOR_STOPS;
-              const gradientCss = activeStops
-                .map((s) => `rgb(${s.color.join(',')}) ${Math.round(s.stop * 100)}%`)
-                .join(', ');
-
-              return options.scaleWidthBySpeed ? (
-                <svg width="120" height="14" style={{ display: 'block' }}>
-                  <defs>
-                    <linearGradient id={legendGradId} x1="0%" y1="0%" x2="100%" y2="0%">
-                      {options.colorMode === 'speed' ? (
-                        activeStops.map((s, idx) => (
-                          <stop
-                            key={idx}
-                            offset={`${Math.round(s.stop * 100)}%`}
-                            stopColor={`rgb(${s.color.join(',')})`}
-                          />
-                        ))
-                      ) : (
-                        <>
-                          <stop offset="0%" stopColor={options.solidColor || '#38bdf8'} />
-                          <stop offset="100%" stopColor={options.solidColor || '#38bdf8'} />
-                        </>
-                      )}
-                    </linearGradient>
-                  </defs>
-                  <polygon points="0,7 120,2 120,12 0,7" fill={`url(#${legendGradId})`} />
-                </svg>
-              ) : (
-                <div
-                  style={{
-                    width: 120,
-                    height: 8,
-                    borderRadius: 4,
-                    background:
-                      options.colorMode === 'speed'
-                        ? `linear-gradient(to right, ${gradientCss})`
-                        : options.solidColor || '#38bdf8',
-                  }}
-                />
-              );
-            })()}
-            <div className={styles.legendTicks}>
-              <span>{isBft ? Math.round(minSpeed) : minSpeed.toFixed(0)}</span>
-              <span>{isBft ? Math.round((minSpeed + maxSpeed) / 2) : ((minSpeed + maxSpeed) / 2).toFixed(0)}</span>
-              <span>{isBft ? `${Math.round(maxSpeed)} Bft` : `${maxSpeed.toFixed(0)} ${speedUnit}`}</span>
+      {/* Overlay Mode Telemetry */}
+      {effectivePlacement === 'overlay' && (
+        <>
+          {renderCurrentOverlay()}
+          {hasLegendInfo && (
+            <div className={styles.legendContainer(options.legendPosition ?? 'bottom-right')}>
+              {renderLegend(isSmall ? 80 : 120)}
             </div>
-          </div>
+          )}
+        </>
+      )}
+      </div>
+
+      {/* Right Sidebar Layout */}
+      {effectivePlacement === 'right' && (
+        <div className={styles.sidebar} style={{ width: sidebarWidth }}>
+          {renderCurrentSidebar()}
+          {hasLegendInfo && (
+            <div className={styles.sidebarCard}>
+              {renderLegend(Math.min(130, sidebarWidth - 28))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Bottom Bar Layout */}
+      {effectivePlacement === 'bottom' && (
+        <div className={styles.bottomBar} style={{ height: bottomBarHeight }}>
+          {renderCurrentBottom()}
+          {hasLegendInfo && (
+            <div className={styles.bottomLegend}>
+              {renderLegend(width < 280 ? 60 : isSmall ? 75 : 105)}
+            </div>
+          )}
         </div>
       )}
     </div>

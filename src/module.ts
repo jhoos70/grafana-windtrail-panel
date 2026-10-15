@@ -240,6 +240,13 @@ export const plugin = new PanelPlugin<WindTrailOptions>(WindTrailPanel).setPanel
         defaultValue: '#ef4444',
         showIf: (config) => config.showHeadMarker,
       })
+      .addBooleanSwitch({
+        category: ['Latest Marker'],
+        path: 'showCurrent',
+        name: 'Show current wind reading',
+        description: 'Display live direction and speed readout (Current: 295° WNW 14 km/h)',
+        defaultValue: true,
+      })
 
       // --- Field Mapping ---
       .addFieldNamePicker({
@@ -346,19 +353,34 @@ export const plugin = new PanelPlugin<WindTrailOptions>(WindTrailPanel).setPanel
         showIf: (config) => config.speedScaleMode === 'custom',
       })
 
-      // --- Legend ---
+      // --- Legend & Layout ---
+      .addSelect({
+        category: ['Legend & Layout'],
+        path: 'infoPlacement',
+        name: 'Layout / info placement',
+        description: 'Positioning for current wind reading and speed scale legend',
+        defaultValue: 'auto',
+        settings: {
+          options: [
+            { value: 'auto', label: 'Auto (Right sidebar when wide, compact when small)' },
+            { value: 'right', label: 'Right sidebar (Compass left, info right)' },
+            { value: 'bottom', label: 'Bottom bar (Compass top, info bottom)' },
+            { value: 'overlay', label: 'Overlay (Floating badges over compass)' },
+          ],
+        },
+      })
       .addBooleanSwitch({
-        category: ['Legend'],
+        category: ['Legend & Layout'],
         path: 'showLegend',
         name: 'Show speed scale legend',
-        description: 'Display an overlay legend showing the wind speed color scale and thickness',
+        description: 'Display a scale legend showing the wind speed color scale and thickness',
         defaultValue: false,
       })
       .addSelect({
-        category: ['Legend'],
+        category: ['Legend & Layout'],
         path: 'legendPosition',
-        name: 'Legend position',
-        description: 'Position of the scale legend on the panel',
+        name: 'Overlay legend position',
+        description: 'Position of the scale legend when in overlay mode',
         defaultValue: 'bottom-right',
         settings: {
           options: [
@@ -368,7 +390,7 @@ export const plugin = new PanelPlugin<WindTrailOptions>(WindTrailPanel).setPanel
             { value: 'bottom-center', label: 'Bottom Center' },
           ],
         },
-        showIf: (config) => Boolean(config.showLegend),
+        showIf: (config) => Boolean(config.showLegend) && (config.infoPlacement === 'overlay' || !config.infoPlacement),
       })
   );
 });

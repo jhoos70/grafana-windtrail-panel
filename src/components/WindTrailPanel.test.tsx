@@ -919,6 +919,142 @@ describe('WindTrailPanel', () => {
       const circlesVisible = containerVisible.querySelectorAll('circle');
       expect(circlesVisible.length).toBeGreaterThanOrEqual(90);
     });
+
+    it('renders right sidebar layout on wide panels when infoPlacement is auto', () => {
+      const now = Date.now();
+      const frame = toDataFrame({
+        fields: [
+          { name: 'time', type: FieldType.time, values: [now - 60000, now] },
+          { name: 'wind_dir', type: FieldType.number, values: [180, 270] },
+          { name: 'wind_speed', type: FieldType.number, values: [12, 18] },
+        ],
+      });
+
+      // Wide panel: width 500, height 300 (aspect ratio 1.67)
+      const { container, getByText } = render(
+        <WindTrailPanel
+          id={1}
+          data={{ series: [frame], state: LoadingState.Done, timeRange: {} as any }}
+          timeRange={{} as any}
+          onFieldConfigChange={jest.fn()}
+          options={{
+            ...defaultOptions,
+            infoPlacement: 'auto',
+            showLegend: true,
+            showCurrent: true,
+          }}
+          width={500}
+          height={300}
+          fieldConfig={{} as any}
+          renderCounter={0}
+          title="Wind Trail"
+          transparent={false}
+          replaceVariables={(s) => s}
+          onOptionsChange={jest.fn()}
+          eventBus={{} as any}
+          timeZone="browser"
+          onChangeTimeRange={jest.fn()}
+        />
+      );
+
+      // Current Wind card in sidebar
+      expect(getByText('Current Wind')).toBeInTheDocument();
+      expect(getByText(/270°/)).toBeInTheDocument();
+      expect(container.textContent).toContain('270°');
+      expect(container.textContent).toContain('18.0 m/s');
+
+      // Legend in sidebar
+      expect(getByText(/Speed \(m\/s\)/i)).toBeInTheDocument();
+
+      // SVG should be allocated compass width, less than total width 500
+      const svg = container.querySelector('svg');
+      expect(svg).toBeInTheDocument();
+      expect(Number(svg?.getAttribute('width'))).toBeLessThan(500);
+      expect(Number(svg?.getAttribute('width'))).toBeGreaterThanOrEqual(340);
+    });
+
+    it('renders bottom bar layout when infoPlacement is bottom', () => {
+      const now = Date.now();
+      const frame = toDataFrame({
+        fields: [
+          { name: 'time', type: FieldType.time, values: [now - 60000, now] },
+          { name: 'wind_dir', type: FieldType.number, values: [90, 135] },
+          { name: 'wind_speed', type: FieldType.number, values: [5, 10] },
+        ],
+      });
+
+      const { container, getByText } = render(
+        <WindTrailPanel
+          id={1}
+          data={{ series: [frame], state: LoadingState.Done, timeRange: {} as any }}
+          timeRange={{} as any}
+          onFieldConfigChange={jest.fn()}
+          options={{
+            ...defaultOptions,
+            infoPlacement: 'bottom',
+            showLegend: true,
+            showCurrent: true,
+          }}
+          width={400}
+          height={400}
+          fieldConfig={{} as any}
+          renderCounter={0}
+          title="Wind Trail"
+          transparent={false}
+          replaceVariables={(s) => s}
+          onOptionsChange={jest.fn()}
+          eventBus={{} as any}
+          timeZone="browser"
+          onChangeTimeRange={jest.fn()}
+        />
+      );
+
+      expect(getByText(/Current:/i)).toBeInTheDocument();
+      expect(getByText(/135°/)).toBeInTheDocument();
+      expect(getByText(/Speed \(m\/s\)/i)).toBeInTheDocument();
+
+      // SVG height should be less than 400 to reserve space for bottom bar
+      const svg = container.querySelector('svg');
+      expect(Number(svg?.getAttribute('height'))).toBeLessThan(400);
+    });
+
+    it('hides current wind readout when showCurrent is false', () => {
+      const now = Date.now();
+      const frame = toDataFrame({
+        fields: [
+          { name: 'time', type: FieldType.time, values: [now - 60000, now] },
+          { name: 'wind_dir', type: FieldType.number, values: [90, 135] },
+          { name: 'wind_speed', type: FieldType.number, values: [5, 10] },
+        ],
+      });
+
+      const { queryByText } = render(
+        <WindTrailPanel
+          id={1}
+          data={{ series: [frame], state: LoadingState.Done, timeRange: {} as any }}
+          timeRange={{} as any}
+          onFieldConfigChange={jest.fn()}
+          options={{
+            ...defaultOptions,
+            showCurrent: false,
+            showLegend: false,
+          }}
+          width={400}
+          height={400}
+          fieldConfig={{} as any}
+          renderCounter={0}
+          title="Wind Trail"
+          transparent={false}
+          replaceVariables={(s) => s}
+          onOptionsChange={jest.fn()}
+          eventBus={{} as any}
+          timeZone="browser"
+          onChangeTimeRange={jest.fn()}
+        />
+      );
+
+      expect(queryByText(/Current/i)).toBeNull();
+    });
   });
 });
 

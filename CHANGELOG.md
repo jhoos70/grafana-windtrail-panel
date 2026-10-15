@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.0
+
+### Features & Enhancements
+- **Responsive Multi-Mode Layout (`infoPlacement`)**: Intelligent layout engine that automatically adapts compass rose geometry and telemetry positioning based on panel aspect ratio and screen size:
+  - **Wide Panels (Right Sidebar)**: On landscape panels (`aspectRatio >= 1.22`), the compass rose is sized to 100% of available height on the left, while Current Wind telemetry and the Speed Scale Legend are stacked cleanly in a dedicated right sidebar. Eliminates horizontal dead space and keeps the compass rose unobstructed.
+  - **Square & Compact Panels (Bottom Bar)**: On square, tall, or small widgets, Current Wind and the Speed Scale Legend are arranged side-by-side along a compact bottom bar below the compass rose. Dynamic radius clamping ensures the scale legend never overlaps the compass rose or wind trail.
+  - **Auto-Compact Readout**: When panel width is under 300px, indicators seamlessly condense into micro-pills (`● 190° (S) 5.2 kn`) with compact scale bars (60–75px) to guarantee zero clipping or overflow.
+- **Show/Hide Current Telemetry Switch (`showCurrent`)**: Added an explicit toggle under Latest Marker options to show or hide the live direction and speed readout.
+
 ## 1.1.0
 
 ### Features & Enhancements

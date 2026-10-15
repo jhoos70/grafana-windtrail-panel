@@ -1,27 +1,15 @@
 # Changelog
 
-## 1.0.4
+## 1.1.0
 
-- **Circular Vector Downsampling (`maxDataPoints`)**: Added intelligent meteorological downsampling for dense datasets and long time horizons (e.g. 24h or 7 days of 1-minute data). Downsamples intermediate points using circular vector averaging ($\sin/\cos$) to prevent trajectory clutter and spaghetti artifacts, while preserving the exact latest observation and time bounds.
-- **Auto-Hide Measurement Dots (`autoHidePoints`)**: Automatically declutters intermediate point circles when point density is high (> 80 points), maintaining a clean trajectory ribbon and the prominent "Current" head marker.
-- **Configurable Limits**: Configurable max points limit slider in panel settings (default: 150 points, or 0 to disable).
-
-## 1.0.3
-
-- **Reverted Spline Overshoot Artifacts**: Restored the clean piecewise polar Archimedean spiral arc (`curveMode: 'polar'`, now default). When wind direction stays constant between observations, the trajectory moves purely radially along that angle spoke, truthfully representing unchanging wind direction over time without z-shaped polynomial overshoot or artificial kinks.
-- **Removed Cubic Spline Artifacts**: Completely eliminated Runge's phenomenon and artificial overshoot around sudden direction shifts.
-
-## 1.0.2
-
-- **Fixed Speed Range & Cross-Panel Comparability**: Added `speedScaleMode` option ('fixed', 'auto', 'custom') ensuring multiple panels share an identical, comparable color and legend scale regardless of query timeframe or transient extremes.
-- **Meteorological Fixed Scale Defaults**: Intelligently sets fixed upper bounds based on unit (e.g. 60 km/h, 20 m/s, 40 kn, 12 Bft, 45 mph) with manual override support (`fixedSpeedMax`).
-- **Windy App Color Palette**: Added authentic multi-stop continuous meteorological gradient inspired by Windy.com (`colorPalette: 'windy'`) alongside legacy standard bands (`'standard'`).
-- **Continuous RGB Interpolation**: Smooth gradient color mapping across arbitrary stops.
-
-## 1.0.1
-
-- **Smooth Polar Spline Curves**: Continuous Catmull-Rom polar spline curve interpolation bridging angular sweeps and time radially.
-- **Unit Conversions & Dashboard Variable Support**: Added live conversion between m/s, km/h, knots, mph, and Beaufort scale with `$speed_unit` variable support.
+### Features & Enhancements
+- **Circular Vector Downsampling (`maxDataPoints`)**: Added intelligent meteorological downsampling for dense datasets and long time horizons (e.g. 24 hours or 7 days of 1-minute data). Downsamples intermediate points using circular vector averaging ($\sin/\cos$ components weighted by wind speed), eliminating North-crossing wrapping errors ($350^\circ \leftrightarrow 10^\circ$) and preventing trajectory clutter while preserving the exact latest observation and time bounds.
+- **Fixed Speed Range & Cross-Panel Comparability (`speedScaleMode`)**: Added standard meteorological scale options (`fixed`, `auto`, `custom`) and intelligent unit defaults (e.g. 0–60 km/h, 0–20 m/s, 0–40 kn, 0–12 Bft, 0–45 mph). Enables immediate visual comparability across different panels and timeframes without color scaling fluctuations caused by transient query extremes.
+- **Windy App Color Palette (`colorPalette: 'windy'`)**: Added authentic continuous multi-stop meteorological gradient inspired by Windy.com, mapping seamlessly from light sky blue (calm) through emerald, lime, amber, orange, vivid red (gale), purple, to magenta (storm).
+- **Polar Spiral Trajectory Arcs (`curveMode: 'polar'`)**: Trajectory paths follow circular compass arcs while smoothly expanding radially with time drift. When wind direction is steady ($\Delta\theta < 1^\circ$), the path advances cleanly along that radial angle spoke without artificial polynomial spline kinks or overshoot. Straight Cartesian chords (`'linear'`) remain available as an option.
+- **Live Unit Conversion & Dashboard Variables**: Built-in conversion between `m/s`, `km/h`, `knots`, `mph`, and `Beaufort (Bft)` scale with template variable interpolation (e.g. `$speed_unit`).
+- **Dynamic Speed & Thickness Scale Legend**: Overlay legend with dynamic SVG linear gradient reflecting the active color palette and tick labels indicating lower, midpoint, and upper bounds in the active unit.
+- **Automatic Measurement Dot Decluttering (`autoHidePoints`)**: Automatically suppresses intermediate point dots when data density is high (> 80 points) to keep the trajectory ribbon legible, while always retaining the prominent glowing red marker at the latest observation.
 
 ## 1.0.0
 

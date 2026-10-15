@@ -20,12 +20,18 @@ updates:
           - '@testing-library/*'
           - 'jest*'
           - '@types/jest'
+        update-types:
+          - 'minor'
+          - 'patch'
       eslint:
         patterns:
           - '@grafana/eslint-config'
           - 'eslint*'
           - '@typescript-eslint/*'
           - '@stylistic/*'
+        update-types:
+          - 'minor'
+          - 'patch'
       grafana:
         patterns:
           - '@grafana/*'
@@ -42,6 +48,11 @@ updates:
         update-types:
           - 'minor'
           - 'patch'
+    ignore:
+      - dependency-name: 'eslint'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'jest'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: 'github-actions'
     directory: '/'

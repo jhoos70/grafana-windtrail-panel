@@ -1206,7 +1206,7 @@ describe('WindTrailPanel', () => {
         ],
       });
 
-      const { getByTestId, container } = render(
+      const { getByTestId } = render(
         <WindTrailPanel
           id={1}
           data={{ series: [frame], state: LoadingState.Done, timeRange: {} as any }}

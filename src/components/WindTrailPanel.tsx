@@ -693,9 +693,11 @@ const getStyles = () => {
       border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 6px;
       padding: 8px 10px;
+      box-sizing: border-box;
       display: flex;
       flex-direction: column;
       gap: 4px;
+      overflow: hidden;
     `,
     sidebarHeader: css`
       display: flex;
@@ -826,11 +828,13 @@ const getStyles = () => {
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 6px;
         padding: 5px 9px;
+        box-sizing: border-box;
         display: flex;
         flex-direction: column;
         gap: 3px;
         z-index: 10;
         user-select: none;
+        overflow: hidden;
       `;
     },
     legendTitle: css`
@@ -847,6 +851,8 @@ const getStyles = () => {
       font-size: 9px;
       color: rgba(255, 255, 255, 0.65);
       margin-top: 2px;
+      box-sizing: border-box;
+      white-space: nowrap;
     `,
   };
 };
@@ -1266,20 +1272,25 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
 
     const hasPins = Boolean(options.showLegendPins) && hasSpeed && maxSpeed > minSpeed;
     const range = maxSpeed - minSpeed;
-    const xMinPin = hasPins ? Math.max(0, Math.min(barWidth, ((dataMinSpeed - minSpeed) / range) * barWidth)) : 0;
-    const xMaxPin = hasPins ? Math.max(0, Math.min(barWidth, ((dataMaxSpeed - minSpeed) / range) * barWidth)) : 0;
+    const innerBarWidth = Math.max(20, barWidth - 4);
+    const xMinPin = hasPins
+      ? Math.max(3, Math.min(innerBarWidth - 3, ((dataMinSpeed - minSpeed) / range) * (innerBarWidth - 6) + 3))
+      : 0;
+    const xMaxPin = hasPins
+      ? Math.max(3, Math.min(innerBarWidth - 3, ((dataMaxSpeed - minSpeed) / range) * (innerBarWidth - 6) + 3))
+      : 0;
 
     return (
-      <div data-testid="windtrail-legend">
+      <div data-testid="windtrail-legend" style={{ maxWidth: '100%', boxSizing: 'border-box' }}>
         <div className={styles.legendTitle}>
           <span>{isBft ? 'Beaufort Scale (Bft)' : `Speed (${speedUnit})`}</span>
         </div>
         <div>
           {hasPins && (
             <svg
-              width={barWidth}
+              width={innerBarWidth}
               height="8"
-              style={{ display: 'block', overflow: 'visible', marginBottom: 1 }}
+              style={{ display: 'block', overflow: 'hidden', marginBottom: 1 }}
               data-testid="windtrail-legend-pins"
             >
               {/* Min pin */}
@@ -1303,7 +1314,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
             </svg>
           )}
           {options.scaleWidthBySpeed ? (
-            <svg width={barWidth} height="14" style={{ display: 'block' }}>
+            <svg width={innerBarWidth} height="14" style={{ display: 'block', overflow: 'hidden' }}>
               <defs>
                 <linearGradient id={legendGradId} x1="0%" y1="0%" x2="100%" y2="0%">
                   {options.colorMode === 'speed' ? (
@@ -1322,12 +1333,12 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
                   )}
                 </linearGradient>
               </defs>
-              <polygon points={`0,7 ${barWidth},2 ${barWidth},12 0,7`} fill={`url(#${legendGradId})`} />
+              <polygon points={`0,7 ${innerBarWidth},2 ${innerBarWidth},12 0,7`} fill={`url(#${legendGradId})`} />
             </svg>
           ) : (
             <div
               style={{
-                width: barWidth,
+                width: innerBarWidth,
                 height: 8,
                 borderRadius: 4,
                 background:
@@ -1337,7 +1348,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
               }}
             />
           )}
-          <div className={styles.legendTicks(barWidth)}>
+          <div className={styles.legendTicks(innerBarWidth)}>
             <span>{isBft ? Math.round(minSpeed) : minSpeed.toFixed(0)}</span>
             <span>{isBft ? Math.round((minSpeed + maxSpeed) / 2) : ((minSpeed + maxSpeed) / 2).toFixed(0)}</span>
             <span>{isBft ? `${Math.round(maxSpeed)} Bft` : `${maxSpeed.toFixed(0)} ${speedUnit}`}</span>
@@ -1898,7 +1909,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
           {renderCurrentSidebar()}
           {hasLegendInfo && (
             <div className={styles.sidebarCard}>
-              {renderLegend(Math.min(130, sidebarWidth - 28))}
+              {renderLegend(Math.max(50, sidebarWidth - 48))}
             </div>
           )}
         </div>

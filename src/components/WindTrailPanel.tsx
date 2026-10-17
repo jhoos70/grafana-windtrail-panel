@@ -1519,10 +1519,11 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
     const style: SectorStyle = options.sectorStyle ?? 'rim';
     const baseColor = options.sectorColor || '#38bdf8';
     const isWedge = style === 'wedge';
+    const isLines = style === 'lines';
 
     const rOuter = maxR;
     const rimThickness = Math.max(6, Math.min(14, maxR * 0.1));
-    const rInner = isWedge ? minR : maxR - rimThickness;
+    const rInner = isWedge || isLines ? minR : maxR - rimThickness;
 
     const pathData = buildSectorPath(
       cxVal,
@@ -1540,35 +1541,41 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
 
     const radStart = (directionSector.startDir * Math.PI) / 180;
     const radEnd = (directionSector.endDir * Math.PI) / 180;
-    const tickInner = rInner - (isWedge ? 0 : 2);
-    const tickOuter = rOuter + 2;
 
-    const x1Start = cxVal + tickInner * Math.sin(radStart);
-    const y1Start = cyVal - tickInner * Math.cos(radStart);
-    const x2Start = cxVal + tickOuter * Math.sin(radStart);
-    const y2Start = cyVal - tickOuter * Math.cos(radStart);
+    // For 'lines' mode: lines run from inner core (minR) all the way to outer perimeter (maxR).
+    // For 'rim' mode: boundary ticks cross the rim band.
+    // For 'wedge' mode: lines run along the radial wedge edges.
+    const lineInner = isLines ? minR : rInner - (isWedge ? 0 : 2);
+    const lineOuter = isLines ? maxR : rOuter + 2;
 
-    const x1End = cxVal + tickInner * Math.sin(radEnd);
-    const y1End = cyVal - tickInner * Math.cos(radEnd);
-    const x2End = cxVal + tickOuter * Math.sin(radEnd);
-    const y2End = cyVal - tickOuter * Math.cos(radEnd);
+    const x1Start = cxVal + lineInner * Math.sin(radStart);
+    const y1Start = cyVal - lineInner * Math.cos(radStart);
+    const x2Start = cxVal + lineOuter * Math.sin(radStart);
+    const y2Start = cyVal - lineOuter * Math.cos(radStart);
+
+    const x1End = cxVal + lineInner * Math.sin(radEnd);
+    const y1End = cyVal - lineInner * Math.cos(radEnd);
+    const x2End = cxVal + lineOuter * Math.sin(radEnd);
+    const y2End = cyVal - lineOuter * Math.cos(radEnd);
+
+    const titleText =
+      directionSector.spanDeg >= 359.9
+        ? 'Wind Direction Range: 0°–360° (Full compass rotation) • Spread: 360°'
+        : `Wind Direction Range: ${Math.round(directionSector.startDir)}° (${getCardinalLabel(directionSector.startDir)}) – ${Math.round(directionSector.endDir)}° (${getCardinalLabel(directionSector.endDir)}) • Spread: ${Math.round(directionSector.spanDeg)}°`;
 
     return (
       <g data-testid="windtrail-sector">
         <path
           d={pathData}
-          fill={baseColor}
-          fillOpacity={isWedge ? 0.16 : 0.32}
-          stroke={baseColor}
-          strokeOpacity={isWedge ? 0.45 : 0.75}
+          fill={isLines ? 'transparent' : baseColor}
+          fillOpacity={isLines ? 0 : isWedge ? 0.16 : 0.32}
+          stroke={isLines ? 'none' : baseColor}
+          strokeOpacity={isLines ? 0 : isWedge ? 0.45 : 0.75}
           strokeWidth="1"
           fillRule="evenodd"
+          pointerEvents={isLines ? 'all' : undefined}
         >
-          <title>
-            {directionSector.spanDeg >= 359.9
-              ? 'Wind Direction Range: 0°–360° (Full compass rotation) • Spread: 360°'
-              : `Wind Direction Range: ${Math.round(directionSector.startDir)}° (${getCardinalLabel(directionSector.startDir)}) – ${Math.round(directionSector.endDir)}° (${getCardinalLabel(directionSector.endDir)}) • Spread: ${Math.round(directionSector.spanDeg)}°`}
-          </title>
+          <title>{titleText}</title>
         </path>
         {directionSector.spanDeg < 359 && (
           <>
@@ -1578,18 +1585,22 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
               x2={x2Start.toFixed(2)}
               y2={y2Start.toFixed(2)}
               stroke={baseColor}
-              strokeWidth="1.5"
+              strokeWidth={isLines ? '1.75' : '1.5'}
               strokeLinecap="round"
-            />
+            >
+              <title>{`Sector Start: ${Math.round(directionSector.startDir)}° (${getCardinalLabel(directionSector.startDir)})`}</title>
+            </line>
             <line
               x1={x1End.toFixed(2)}
               y1={y1End.toFixed(2)}
               x2={x2End.toFixed(2)}
               y2={y2End.toFixed(2)}
               stroke={baseColor}
-              strokeWidth="1.5"
+              strokeWidth={isLines ? '1.75' : '1.5'}
               strokeLinecap="round"
-            />
+            >
+              <title>{`Sector End: ${Math.round(directionSector.endDir)}° (${getCardinalLabel(directionSector.endDir)})`}</title>
+            </line>
           </>
         )}
       </g>

@@ -405,12 +405,13 @@ export const plugin = new PanelPlugin<WindTrailOptions>(WindTrailPanel).setPanel
         category: ['Statistics & Variation'],
         path: 'sectorStyle',
         name: 'Sector display style',
-        description: 'Choose between an outer rim arc or a full radial wedge',
+        description: 'Choose display style for the wind direction sector',
         defaultValue: 'rim',
         settings: {
           options: [
             { value: 'rim', label: 'Outer rim band (leaves center clear)' },
             { value: 'wedge', label: 'Radial wedge (translucent backdrop)' },
+            { value: 'lines', label: 'Sector lines (two radial lines, transparent background)' },
           ],
         },
         showIf: (config) => Boolean(config.showAngleSector),

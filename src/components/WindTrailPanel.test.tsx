@@ -1196,6 +1196,54 @@ describe('WindTrailPanel', () => {
       expect(getByTestId('windtrail-sector')).toBeInTheDocument();
     });
 
+    it('renders wind direction sector with sectorStyle lines (transparent background and radial lines)', () => {
+      const now = Date.now();
+      const frame = toDataFrame({
+        fields: [
+          { name: 'time', type: FieldType.time, values: [now - 60000, now - 30000, now] },
+          { name: 'wind_dir', type: FieldType.number, values: [270, 310, 100] },
+          { name: 'wind_speed', type: FieldType.number, values: [5, 8, 12] },
+        ],
+      });
+
+      const { getByTestId, container } = render(
+        <WindTrailPanel
+          id={1}
+          data={{ series: [frame], state: LoadingState.Done, timeRange: {} as any }}
+          timeRange={{} as any}
+          onFieldConfigChange={jest.fn()}
+          options={{
+            ...defaultOptions,
+            showAngleSector: true,
+            sectorStyle: 'lines',
+            sectorColor: '#38bdf8',
+          }}
+          width={400}
+          height={400}
+          fieldConfig={{} as any}
+          renderCounter={0}
+          title="Wind Trail"
+          transparent={false}
+          replaceVariables={(s) => s}
+          onOptionsChange={jest.fn()}
+          eventBus={{} as any}
+          timeZone="browser"
+          onChangeTimeRange={jest.fn()}
+        />
+      );
+
+      const sectorGroup = getByTestId('windtrail-sector');
+      expect(sectorGroup).toBeInTheDocument();
+      const path = sectorGroup.querySelector('path');
+      expect(path).toHaveAttribute('fill', 'transparent');
+      expect(path).toHaveAttribute('stroke', 'none');
+
+      const lines = sectorGroup.querySelectorAll('line');
+      expect(lines).toHaveLength(2);
+      expect(lines[0]).toHaveAttribute('stroke', '#38bdf8');
+      expect(lines[1]).toHaveAttribute('stroke', '#38bdf8');
+    });
+
     it('renders min and max speed statistics when showSpeedMinMax is true', () => {
       const now = Date.now();
       const frame = toDataFrame({

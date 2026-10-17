@@ -318,44 +318,121 @@ export interface DirectionSector {
   spanDeg: number;
 }
 
+export interface RawDirectionPoint {
+  dir: number;
+  speed?: number;
+}
+
 /**
- * Computes the shortest enclosing angular sector (min/max range) for an array of wind directions.
- * Accurately handles crossing North (0°/360°) by identifying the largest empty angular gap.
+ * Computes the angular turning corridor / sector (min/max range) for wind observations.
+ * Uses continuous phase unwrapping along the chronological trajectory to accurately
+ * follow how the wind physically turned (e.g. 270° through North to 100°).
+ * Filters out calm observations (speed <= 0 or < 0.2) which lack meaningful direction.
+ * If the wind completed a full rotation across all directions (span >= 360°),
+ * it returns a full 360° sector.
  */
-export const computeDirectionSector = (dirs: number[]): DirectionSector => {
-  if (dirs.length === 0) {
+export const computeDirectionSector = (
+  points: Array<RawDirectionPoint | number>,
+  speeds?: number[],
+  hasSpeed = true
+): DirectionSector => {
+  if (!points || points.length === 0) {
     return { startDir: 0, endDir: 0, spanDeg: 0 };
   }
-  const uniqueNormalized = Array.from(
-    new Set(dirs.map((d) => ((d % 360) + 360) % 360))
-  ).sort((a, b) => a - b);
 
-  const k = uniqueNormalized.length;
+  // Normalize points into an array of { dir, speed }
+  const raw: Array<{ dir: number; speed?: number }> = [];
+  for (let i = 0; i < points.length; i++) {
+    const item = points[i];
+    if (typeof item === 'number') {
+      const spd = speeds && i < speeds.length ? speeds[i] : undefined;
+      raw.push({ dir: item, speed: spd });
+    } else if (item && typeof item.dir === 'number') {
+      raw.push({ dir: item.dir, speed: item.speed });
+    }
+  }
+
+  if (raw.length === 0) {
+    return { startDir: 0, endDir: 0, spanDeg: 0 };
+  }
+
+  // Filter calm points if speeds are present
+  const anyPositiveSpeed = raw.some((p) => p.speed != null && !isNaN(p.speed) && p.speed > 0);
+  let filtered: number[];
+
+  if (anyPositiveSpeed) {
+    // Discard calm readings (speed <= 0 or < 0.2) where wind direction is undefined or artificial 0°
+    filtered = raw
+      .filter((p) => p.speed != null && !isNaN(p.speed) && p.speed >= 0.2)
+      .map((p) => p.dir);
+    // If threshold 0.2 filtered everything, fallback to speed > 0
+    if (filtered.length === 0) {
+      filtered = raw
+        .filter((p) => p.speed != null && !isNaN(p.speed) && p.speed > 0)
+        .map((p) => p.dir);
+    }
+  } else if (hasSpeed && raw.every((p) => p.speed != null && !isNaN(p.speed) && p.speed <= 0)) {
+    // All observations are dead calm (speed == 0)
+    return { startDir: 0, endDir: 0, spanDeg: 0 };
+  } else {
+    // No speed measurements available: use all directions
+    filtered = raw.map((p) => p.dir);
+  }
+
+  if (filtered.length === 0) {
+    return { startDir: 0, endDir: 0, spanDeg: 0 };
+  }
+
+  const k = filtered.length;
   if (k === 1) {
+    const norm = ((filtered[0] % 360) + 360) % 360;
     return {
-      startDir: uniqueNormalized[0],
-      endDir: uniqueNormalized[0],
+      startDir: norm,
+      endDir: norm,
       spanDeg: 0,
     };
   }
 
-  let maxGap = -1;
-  let maxGapIdx = 0;
+  // Continuous phase unwrapping along the chronological trajectory
+  const first = ((filtered[0] % 360) + 360) % 360;
+  const unwrapped: number[] = [first];
+  let uMin = first;
+  let uMax = first;
 
-  for (let i = 0; i < k; i++) {
-    const nextVal = i === k - 1 ? uniqueNormalized[0] + 360 : uniqueNormalized[i + 1];
-    const gap = nextVal - uniqueNormalized[i];
-    if (gap > maxGap) {
-      maxGap = gap;
-      maxGapIdx = i;
+  for (let i = 1; i < k; i++) {
+    const cur = ((filtered[i] % 360) + 360) % 360;
+    const prevUnwrapped = unwrapped[unwrapped.length - 1];
+    // Shortest angular difference (-180° to +180°)
+    const diff = ((((cur - prevUnwrapped + 180) % 360) + 360) % 360) - 180;
+    const nextUnwrapped = prevUnwrapped + diff;
+    unwrapped.push(nextUnwrapped);
+
+    if (nextUnwrapped < uMin) {
+      uMin = nextUnwrapped;
+    }
+    if (nextUnwrapped > uMax) {
+      uMax = nextUnwrapped;
     }
   }
 
-  const startDir = uniqueNormalized[(maxGapIdx + 1) % k];
-  const endDir = uniqueNormalized[maxGapIdx];
-  const spanDeg = Math.max(0, 360 - maxGap);
+  const totalSpan = uMax - uMin;
+  if (totalSpan >= 359.9) {
+    // Full 360° compass circle covered
+    return {
+      startDir: 0,
+      endDir: 360,
+      spanDeg: 360,
+    };
+  }
 
-  return { startDir, endDir, spanDeg };
+  const startDir = ((uMin % 360) + 360) % 360;
+  const endDir = ((uMax % 360) + 360) % 360;
+
+  return {
+    startDir,
+    endDir,
+    spanDeg: totalSpan,
+  };
 };
 
 /**
@@ -375,12 +452,16 @@ export const buildSectorPath = (
     return '';
   }
   if (spanDeg >= 359.9) {
-    // Full circle annular ring
+    const cxF = cx.toFixed(2);
     const topOuter = (cy - rOuter).toFixed(2);
     const botOuter = (cy + rOuter).toFixed(2);
+    if (rInner <= 0) {
+      // Full circle wedge / disk
+      return `M ${cxF} ${topOuter} A ${rOuter} ${rOuter} 0 1 0 ${cxF} ${botOuter} A ${rOuter} ${rOuter} 0 1 0 ${cxF} ${topOuter} Z`;
+    }
+    // Full circle annular ring
     const topInner = (cy - rInner).toFixed(2);
     const botInner = (cy + rInner).toFixed(2);
-    const cxF = cx.toFixed(2);
     return `M ${cxF} ${topOuter} A ${rOuter} ${rOuter} 0 1 0 ${cxF} ${botOuter} A ${rOuter} ${rOuter} 0 1 0 ${cxF} ${topOuter} M ${cxF} ${topInner} A ${rInner} ${rInner} 0 1 1 ${cxF} ${botInner} A ${rInner} ${rInner} 0 1 1 ${cxF} ${topInner} Z`;
   }
 
@@ -1012,7 +1093,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
       dataAvgSpeed = sSum / rawPoints.length;
     }
 
-    const directionSector = computeDirectionSector(rawPoints.map((p) => p.dir));
+    const directionSector = computeDirectionSector(rawPoints, undefined, Boolean(speedField));
 
     return {
       points: finalPoints,
@@ -1368,7 +1449,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
         )}
         {options.showAngleSector && directionSector.spanDeg > 0 && !isNarrow && (
           <span style={{ color: theme.colors.text.secondary, fontSize: 10, whiteSpace: 'nowrap' }} data-testid="windtrail-bottom-dir-range">
-            [{Math.round(directionSector.startDir)}°–{Math.round(directionSector.endDir)}°]
+            [{directionSector.spanDeg >= 359.9 ? '0°–360°' : `${Math.round(directionSector.startDir)}°–${Math.round(directionSector.endDir)}°`}]
           </span>
         )}
         {options.showSpeedMinMax && hasSpeed && (
@@ -1417,7 +1498,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
           )}
           {options.showAngleSector && directionSector.spanDeg > 0 && (
             <span style={{ color: theme.colors.text.secondary, fontSize: 10 }} data-testid="windtrail-overlay-dir-range">
-              [{Math.round(directionSector.startDir)}°–{Math.round(directionSector.endDir)}°]
+              [{directionSector.spanDeg >= 359.9 ? '0°–360°' : `${Math.round(directionSector.startDir)}°–${Math.round(directionSector.endDir)}°`}]
             </span>
           )}
           {options.showSpeedMinMax && hasSpeed && (
@@ -1482,7 +1563,11 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
           strokeOpacity={isWedge ? 0.45 : 0.75}
           strokeWidth="1"
         >
-          <title>{`Wind Direction Range: ${Math.round(directionSector.startDir)}° (${getCardinalLabel(directionSector.startDir)}) – ${Math.round(directionSector.endDir)}° (${getCardinalLabel(directionSector.endDir)}) • Spread: ${Math.round(directionSector.spanDeg)}°`}</title>
+          <title>
+            {directionSector.spanDeg >= 359.9
+              ? 'Wind Direction Range: 0°–360° (Full compass rotation) • Spread: 360°'
+              : `Wind Direction Range: ${Math.round(directionSector.startDir)}° (${getCardinalLabel(directionSector.startDir)}) – ${Math.round(directionSector.endDir)}° (${getCardinalLabel(directionSector.endDir)}) • Spread: ${Math.round(directionSector.spanDeg)}°`}
+          </title>
         </path>
         {directionSector.spanDeg < 359 && (
           <>

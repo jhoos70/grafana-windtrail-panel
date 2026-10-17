@@ -1081,9 +1081,44 @@ describe('WindTrailPanel', () => {
         expect(sector.spanDeg).toBe(40);
       });
 
-      it('handles full circle correctly', () => {
-        const sector = computeDirectionSector([0, 90, 180, 270]);
-        expect(sector.spanDeg).toBe(270);
+      it('handles turning from 270° through North to 100°', () => {
+        const sector = computeDirectionSector([270, 310, 350, 40, 100]);
+        expect(sector.startDir).toBe(270);
+        expect(sector.endDir).toBe(100);
+        expect(sector.spanDeg).toBe(190);
+      });
+
+      it('handles turning from 100° through South to 270°', () => {
+        const sector = computeDirectionSector([100, 160, 220, 270]);
+        expect(sector.startDir).toBe(100);
+        expect(sector.endDir).toBe(270);
+        expect(sector.spanDeg).toBe(170);
+      });
+
+      it('filters out calm readings (speed 0) that distort the directional turning corridor', () => {
+        const sector = computeDirectionSector(
+          [270, 310, 0, 100],
+          [5, 5, 0, 5]
+        );
+        expect(sector.startDir).toBe(270);
+        expect(sector.endDir).toBe(100);
+        expect(sector.spanDeg).toBe(190);
+      });
+
+      it('handles dead calm throughout the time window gracefully', () => {
+        const sector = computeDirectionSector(
+          [0, 0, 0],
+          [0, 0, 0],
+          true
+        );
+        expect(sector).toEqual({ startDir: 0, endDir: 0, spanDeg: 0 });
+      });
+
+      it('handles full 360 degree rotation across all compass directions', () => {
+        const sector = computeDirectionSector([210, 310, 100, 160, 270, 360]);
+        expect(sector.spanDeg).toBe(360);
+        expect(sector.startDir).toBe(0);
+        expect(sector.endDir).toBe(360);
       });
     });
 
@@ -1107,10 +1142,18 @@ describe('WindTrailPanel', () => {
         expect(path).toContain('Z');
       });
 
-      it('handles 360 degree full circle', () => {
-        const path = buildSectorPath(100, 100, 70, 80, 0, 0, 360);
+      it('handles 360 degree full circle annular ring', () => {
+        const path = buildSectorPath(100, 100, 70, 80, 0, 360, 360);
         expect(path).toContain('M');
         expect(path).toContain('A 80 80');
+        expect(path).toContain('A 70 70');
+      });
+
+      it('handles 360 degree full circle radial wedge disk (rInner = 0)', () => {
+        const path = buildSectorPath(100, 100, 0, 80, 0, 360, 360);
+        expect(path).toContain('M');
+        expect(path).toContain('A 80 80');
+        expect(path).not.toContain('A 0 0');
       });
     });
 

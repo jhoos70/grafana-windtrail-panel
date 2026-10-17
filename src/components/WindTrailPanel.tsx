@@ -9,6 +9,7 @@ import {
   InfoPlacement,
   CurveMode,
   ColorPalette,
+  SectorStyle,
 } from '../types';
 import { css } from '@emotion/css';
 import { useStyles2, useTheme2 } from '@grafana/ui';
@@ -311,6 +312,181 @@ export const buildSegmentPath = (
   return parts.join(' ');
 };
 
+export interface DirectionSector {
+  startDir: number;
+  endDir: number;
+  spanDeg: number;
+}
+
+export interface RawDirectionPoint {
+  dir: number;
+  speed?: number;
+}
+
+/**
+ * Computes the angular turning corridor / sector (min/max range) for wind observations.
+ * Uses continuous phase unwrapping along the chronological trajectory to accurately
+ * follow how the wind physically turned (e.g. 270° through North to 100°).
+ * Filters out calm observations (speed <= 0 or < 0.2) which lack meaningful direction.
+ * If the wind completed a full rotation across all directions (span >= 360°),
+ * it returns a full 360° sector.
+ */
+export const computeDirectionSector = (
+  points: Array<RawDirectionPoint | number>,
+  speeds?: number[],
+  hasSpeed = true
+): DirectionSector => {
+  if (!points || points.length === 0) {
+    return { startDir: 0, endDir: 0, spanDeg: 0 };
+  }
+
+  // Normalize points into an array of { dir, speed }
+  const raw: Array<{ dir: number; speed?: number }> = [];
+  for (let i = 0; i < points.length; i++) {
+    const item = points[i];
+    if (typeof item === 'number') {
+      const spd = speeds && i < speeds.length ? speeds[i] : undefined;
+      raw.push({ dir: item, speed: spd });
+    } else if (item && typeof item.dir === 'number') {
+      raw.push({ dir: item.dir, speed: item.speed });
+    }
+  }
+
+  if (raw.length === 0) {
+    return { startDir: 0, endDir: 0, spanDeg: 0 };
+  }
+
+  // Filter calm points if speeds are present
+  const anyPositiveSpeed = raw.some((p) => p.speed != null && !isNaN(p.speed) && p.speed > 0);
+  let filtered: number[];
+
+  if (anyPositiveSpeed) {
+    // Discard calm readings (speed <= 0 or < 0.2) where wind direction is undefined or artificial 0°
+    filtered = raw
+      .filter((p) => p.speed != null && !isNaN(p.speed) && p.speed >= 0.2)
+      .map((p) => p.dir);
+    // If threshold 0.2 filtered everything, fallback to speed > 0
+    if (filtered.length === 0) {
+      filtered = raw
+        .filter((p) => p.speed != null && !isNaN(p.speed) && p.speed > 0)
+        .map((p) => p.dir);
+    }
+  } else if (hasSpeed && raw.every((p) => p.speed != null && !isNaN(p.speed) && p.speed <= 0)) {
+    // All observations are dead calm (speed == 0)
+    return { startDir: 0, endDir: 0, spanDeg: 0 };
+  } else {
+    // No speed measurements available: use all directions
+    filtered = raw.map((p) => p.dir);
+  }
+
+  if (filtered.length === 0) {
+    return { startDir: 0, endDir: 0, spanDeg: 0 };
+  }
+
+  const k = filtered.length;
+  if (k === 1) {
+    const norm = ((filtered[0] % 360) + 360) % 360;
+    return {
+      startDir: norm,
+      endDir: norm,
+      spanDeg: 0,
+    };
+  }
+
+  // Continuous phase unwrapping along the chronological trajectory
+  const first = ((filtered[0] % 360) + 360) % 360;
+  const unwrapped: number[] = [first];
+  let uMin = first;
+  let uMax = first;
+
+  for (let i = 1; i < k; i++) {
+    const cur = ((filtered[i] % 360) + 360) % 360;
+    const prevUnwrapped = unwrapped[unwrapped.length - 1];
+    // Shortest angular difference (-180° to +180°)
+    const diff = ((((cur - prevUnwrapped + 180) % 360) + 360) % 360) - 180;
+    const nextUnwrapped = prevUnwrapped + diff;
+    unwrapped.push(nextUnwrapped);
+
+    if (nextUnwrapped < uMin) {
+      uMin = nextUnwrapped;
+    }
+    if (nextUnwrapped > uMax) {
+      uMax = nextUnwrapped;
+    }
+  }
+
+  const totalSpan = uMax - uMin;
+  if (totalSpan >= 359.9) {
+    // Full 360° compass circle covered
+    return {
+      startDir: 0,
+      endDir: 360,
+      spanDeg: 360,
+    };
+  }
+
+  const startDir = ((uMin % 360) + 360) % 360;
+  const endDir = ((uMax % 360) + 360) % 360;
+
+  return {
+    startDir,
+    endDir,
+    spanDeg: totalSpan,
+  };
+};
+
+/**
+ * Generates an SVG path for an annular sector or radial wedge.
+ * Compass coordinates: 0° is North (top), 90° is East (right), clockwise.
+ */
+export const buildSectorPath = (
+  cx: number,
+  cy: number,
+  rInner: number,
+  rOuter: number,
+  startDir: number,
+  endDir: number,
+  spanDeg: number
+): string => {
+  if (spanDeg <= 0) {
+    return '';
+  }
+  if (spanDeg >= 359.9) {
+    const cxF = cx.toFixed(2);
+    const topOuter = (cy - rOuter).toFixed(2);
+    const botOuter = (cy + rOuter).toFixed(2);
+    if (rInner <= 0) {
+      // Full circle wedge / disk
+      return `M ${cxF} ${topOuter} A ${rOuter} ${rOuter} 0 1 0 ${cxF} ${botOuter} A ${rOuter} ${rOuter} 0 1 0 ${cxF} ${topOuter} Z`;
+    }
+    // Full circle annular ring
+    const topInner = (cy - rInner).toFixed(2);
+    const botInner = (cy + rInner).toFixed(2);
+    return `M ${cxF} ${topOuter} A ${rOuter} ${rOuter} 0 1 0 ${cxF} ${botOuter} A ${rOuter} ${rOuter} 0 1 0 ${cxF} ${topOuter} M ${cxF} ${topInner} A ${rInner} ${rInner} 0 1 1 ${cxF} ${botInner} A ${rInner} ${rInner} 0 1 1 ${cxF} ${topInner} Z`;
+  }
+
+  const radStart = (startDir * Math.PI) / 180;
+  const radEnd = (endDir * Math.PI) / 180;
+
+  const x1Outer = (cx + rOuter * Math.sin(radStart)).toFixed(2);
+  const y1Outer = (cy - rOuter * Math.cos(radStart)).toFixed(2);
+  const x2Outer = (cx + rOuter * Math.sin(radEnd)).toFixed(2);
+  const y2Outer = (cy - rOuter * Math.cos(radEnd)).toFixed(2);
+
+  const largeArc = spanDeg > 180 ? 1 : 0;
+
+  if (rInner <= 0) {
+    return `M ${cx.toFixed(2)} ${cy.toFixed(2)} L ${x1Outer} ${y1Outer} A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${x2Outer} ${y2Outer} Z`;
+  }
+
+  const x1Inner = (cx + rInner * Math.sin(radStart)).toFixed(2);
+  const y1Inner = (cy - rInner * Math.cos(radStart)).toFixed(2);
+  const x2Inner = (cx + rInner * Math.sin(radEnd)).toFixed(2);
+  const y2Inner = (cy - rInner * Math.cos(radEnd)).toFixed(2);
+
+  return `M ${x1Inner} ${y1Inner} L ${x1Outer} ${y1Outer} A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${x2Outer} ${y2Outer} L ${x2Inner} ${y2Inner} A ${rInner} ${rInner} 0 ${largeArc} 0 ${x1Inner} ${y1Inner} Z`;
+};
+
 const CARDINALS_16 = [
   { label: 'N', deg: 0 },
   { label: 'NNE', deg: 22.5 },
@@ -517,9 +693,11 @@ const getStyles = () => {
       border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 6px;
       padding: 8px 10px;
+      box-sizing: border-box;
       display: flex;
       flex-direction: column;
       gap: 4px;
+      overflow: hidden;
     `,
     sidebarHeader: css`
       display: flex;
@@ -551,6 +729,33 @@ const getStyles = () => {
       font-size: 13px;
       font-weight: 600;
       color: #4ade80;
+    `,
+    sidebarStats: css`
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      margin-top: 4px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 11px;
+    `,
+    statRow: css`
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    `,
+    statLabel: css`
+      color: rgba(255, 255, 255, 0.55);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    `,
+    statValue: css`
+      color: rgba(255, 255, 255, 0.9);
+      font-weight: 600;
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
     `,
     bottomBar: css`
       display: flex;
@@ -623,11 +828,13 @@ const getStyles = () => {
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 6px;
         padding: 5px 9px;
+        box-sizing: border-box;
         display: flex;
         flex-direction: column;
         gap: 3px;
         z-index: 10;
         user-select: none;
+        overflow: hidden;
       `;
     },
     legendTitle: css`
@@ -644,6 +851,8 @@ const getStyles = () => {
       font-size: 9px;
       color: rgba(255, 255, 255, 0.65);
       margin-top: 2px;
+      box-sizing: border-box;
+      white-space: nowrap;
     `,
   };
 };
@@ -656,7 +865,21 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
   const legendGradId = useId();
 
   // 1. Extract and process data
-  const { points, tMin, tMax, minSpeed, maxSpeed, hasSpeed, speedUnit, isBft, latestPoint } = useMemo(() => {
+  const {
+    points,
+    tMin,
+    tMax,
+    minSpeed,
+    maxSpeed,
+    dataMinSpeed,
+    dataMaxSpeed,
+    dataAvgSpeed,
+    directionSector,
+    hasSpeed,
+    speedUnit,
+    isBft,
+    latestPoint,
+  } = useMemo(() => {
     if (!data.series || data.series.length === 0) {
       return {
         points: [],
@@ -664,6 +887,10 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
         tMax: 0,
         minSpeed: 0,
         maxSpeed: 0,
+        dataMinSpeed: 0,
+        dataMaxSpeed: 0,
+        dataAvgSpeed: 0,
+        directionSector: { startDir: 0, endDir: 0, spanDeg: 0 },
         hasSpeed: false,
         speedField: undefined,
         speedUnit: 'm/s',
@@ -716,6 +943,10 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
         tMax: 0,
         minSpeed: 0,
         maxSpeed: 0,
+        dataMinSpeed: 0,
+        dataMaxSpeed: 0,
+        dataAvgSpeed: 0,
+        directionSector: { startDir: 0, endDir: 0, spanDeg: 0 },
         hasSpeed: false,
         speedField: undefined,
         speedUnit: 'm/s',
@@ -783,6 +1014,10 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
         tMax: 0,
         minSpeed: 0,
         maxSpeed: 0,
+        dataMinSpeed: 0,
+        dataMaxSpeed: 0,
+        dataAvgSpeed: 0,
+        directionSector: { startDir: 0, endDir: 0, spanDeg: 0 },
         hasSpeed: false,
         speedField: undefined,
         speedUnit: effectiveUnit,
@@ -842,12 +1077,40 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
       maxSpeed = dMax === -Infinity || isNaN(dMax) ? 10 : dMax;
     }
 
+    // Calculate observed speed statistics
+    let dataMinSpeed = 0;
+    let dataMaxSpeed = 0;
+    let dataAvgSpeed = 0;
+    if (rawPoints.length > 0 && Boolean(speedField)) {
+      let sMin = Infinity;
+      let sMax = -Infinity;
+      let sSum = 0;
+      for (const p of rawPoints) {
+        if (p.speed < sMin) {
+          sMin = p.speed;
+        }
+        if (p.speed > sMax) {
+          sMax = p.speed;
+        }
+        sSum += p.speed;
+      }
+      dataMinSpeed = sMin === Infinity ? 0 : sMin;
+      dataMaxSpeed = sMax === -Infinity ? 0 : sMax;
+      dataAvgSpeed = sSum / rawPoints.length;
+    }
+
+    const directionSector = computeDirectionSector(rawPoints, undefined, Boolean(speedField));
+
     return {
       points: finalPoints,
       tMin,
       tMax,
       minSpeed,
       maxSpeed,
+      dataMinSpeed,
+      dataMaxSpeed,
+      dataAvgSpeed,
+      directionSector,
       hasSpeed: Boolean(speedField),
       speedField,
       speedUnit: effectiveUnit,
@@ -872,7 +1135,8 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
   ]);
 
   // 2. Geometry calculations & responsive layout
-  const hasCurrentInfo = options.showCurrent !== false && Boolean(latestPoint);
+  const hasStatsInfo = Boolean(options.showSpeedMinMax || options.showAngleSector);
+  const hasCurrentInfo = (options.showCurrent !== false || hasStatsInfo) && Boolean(latestPoint);
   const hasLegendInfo = Boolean(options.showLegend) && hasSpeed;
   const hasAnyInfo = hasCurrentInfo || hasLegendInfo;
 
@@ -1002,52 +1266,80 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
 
     const isWindy = (options.colorPalette ?? 'windy') === 'windy';
     const activeStops = isWindy ? WINDY_COLOR_STOPS : STANDARD_COLOR_STOPS;
-    const gradientCss = activeStops
-      .map((s) => `rgb(${s.color.join(',')}) ${Math.round(s.stop * 100)}%`)
-      .join(', ');
+
+    const hasPins = Boolean(options.showLegendPins) && hasSpeed && maxSpeed > minSpeed;
+    const range = maxSpeed - minSpeed;
+    const innerBarWidth = Math.max(20, barWidth - 4);
+    const xMinPin = hasPins
+      ? Math.max(3, Math.min(innerBarWidth - 3, ((dataMinSpeed - minSpeed) / range) * (innerBarWidth - 6) + 3))
+      : 0;
+    const xMaxPin = hasPins
+      ? Math.max(3, Math.min(innerBarWidth - 3, ((dataMaxSpeed - minSpeed) / range) * (innerBarWidth - 6) + 3))
+      : 0;
+    const isTriangle =
+      options.legendShape !== undefined
+        ? options.legendShape === 'triangle'
+        : Boolean(options.scaleWidthBySpeed);
 
     return (
-      <div data-testid="windtrail-legend">
+      <div data-testid="windtrail-legend" style={{ maxWidth: '100%', boxSizing: 'border-box' }}>
         <div className={styles.legendTitle}>
           <span>{isBft ? 'Beaufort Scale (Bft)' : `Speed (${speedUnit})`}</span>
         </div>
         <div>
-          {options.scaleWidthBySpeed ? (
-            <svg width={barWidth} height="14" style={{ display: 'block' }}>
-              <defs>
-                <linearGradient id={legendGradId} x1="0%" y1="0%" x2="100%" y2="0%">
-                  {options.colorMode === 'speed' ? (
-                    activeStops.map((s, idx) => (
-                      <stop
-                        key={idx}
-                        offset={`${Math.round(s.stop * 100)}%`}
-                        stopColor={`rgb(${s.color.join(',')})`}
-                      />
-                    ))
-                  ) : (
-                    <>
-                      <stop offset="0%" stopColor={options.solidColor || '#38bdf8'} />
-                      <stop offset="100%" stopColor={options.solidColor || '#38bdf8'} />
-                    </>
-                  )}
-                </linearGradient>
-              </defs>
-              <polygon points={`0,7 ${barWidth},2 ${barWidth},12 0,7`} fill={`url(#${legendGradId})`} />
+          {hasPins && (
+            <svg
+              width={innerBarWidth}
+              height="8"
+              style={{ display: 'block', overflow: 'hidden', marginBottom: 1 }}
+              data-testid="windtrail-legend-pins"
+            >
+              {/* Min pin */}
+              <polygon
+                points={`${(xMinPin - 3).toFixed(1)},1 ${(xMinPin + 3).toFixed(1)},1 ${xMinPin.toFixed(1)},6`}
+                fill="#38bdf8"
+                stroke="#ffffff"
+                strokeWidth="0.5"
+              >
+                <title>{`Observed Min Speed: ${formatSpeed(dataMinSpeed, speedUnit, isBft)}`}</title>
+              </polygon>
+              {/* Max pin */}
+              <polygon
+                points={`${(xMaxPin - 3).toFixed(1)},1 ${(xMaxPin + 3).toFixed(1)},1 ${xMaxPin.toFixed(1)},6`}
+                fill="#ef4444"
+                stroke="#ffffff"
+                strokeWidth="0.5"
+              >
+                <title>{`Observed Max Speed (Gust): ${formatSpeed(dataMaxSpeed, speedUnit, isBft)}`}</title>
+              </polygon>
             </svg>
-          ) : (
-            <div
-              style={{
-                width: barWidth,
-                height: 8,
-                borderRadius: 4,
-                background:
-                  options.colorMode === 'speed'
-                    ? `linear-gradient(to right, ${gradientCss})`
-                    : options.solidColor || '#38bdf8',
-              }}
-            />
           )}
-          <div className={styles.legendTicks(barWidth)}>
+          <svg width={innerBarWidth} height="14" style={{ display: 'block', overflow: 'hidden' }}>
+            <defs>
+              <linearGradient id={legendGradId} x1="0%" y1="0%" x2="100%" y2="0%">
+                {options.colorMode === 'speed' ? (
+                  activeStops.map((s, idx) => (
+                    <stop
+                      key={idx}
+                      offset={`${Math.round(s.stop * 100)}%`}
+                      stopColor={`rgb(${s.color.join(',')})`}
+                    />
+                  ))
+                ) : (
+                  <>
+                    <stop offset="0%" stopColor={options.solidColor || '#38bdf8'} />
+                    <stop offset="100%" stopColor={options.solidColor || '#38bdf8'} />
+                  </>
+                )}
+              </linearGradient>
+            </defs>
+            {isTriangle ? (
+              <polygon points={`0,7 ${innerBarWidth},2 ${innerBarWidth},12 0,7`} fill={`url(#${legendGradId})`} />
+            ) : (
+              <rect x="0" y="2" width={innerBarWidth} height="10" rx="3" ry="3" fill={`url(#${legendGradId})`} />
+            )}
+          </svg>
+          <div className={styles.legendTicks(innerBarWidth)}>
             <span>{isBft ? Math.round(minSpeed) : minSpeed.toFixed(0)}</span>
             <span>{isBft ? Math.round((minSpeed + maxSpeed) / 2) : ((minSpeed + maxSpeed) / 2).toFixed(0)}</span>
             <span>{isBft ? `${Math.round(maxSpeed)} Bft` : `${maxSpeed.toFixed(0)} ${speedUnit}`}</span>
@@ -1061,28 +1353,65 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
     if (!hasCurrentInfo || !latestPoint) {
       return null;
     }
+    const showLiveReading = options.showCurrent !== false;
     return (
       <div className={styles.sidebarCard} data-testid="windtrail-current">
-        <div className={styles.sidebarHeader}>
-          <span
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: '50%',
-              backgroundColor: options.headMarkerColor || '#ef4444',
-              display: 'inline-block',
-              boxShadow: `0 0 6px ${options.headMarkerColor || '#ef4444'}`,
-            }}
-          />
-          <span>Current Wind</span>
-        </div>
-        <div className={styles.sidebarDir}>
-          <span>{Math.round(latestPoint.dir)}°</span>
-          <span className={styles.cardinalBadge}>{getCardinalLabel(latestPoint.dir)}</span>
-        </div>
-        {hasSpeed && (
-          <div className={styles.sidebarSpeed}>
-            {formatSpeed(latestPoint.speed, speedUnit, isBft)}
+        {showLiveReading && (
+          <>
+            <div className={styles.sidebarHeader}>
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  backgroundColor: options.headMarkerColor || '#ef4444',
+                  display: 'inline-block',
+                  boxShadow: `0 0 6px ${options.headMarkerColor || '#ef4444'}`,
+                }}
+              />
+              <span>Current Wind</span>
+            </div>
+            <div className={styles.sidebarDir}>
+              <span>{Math.round(latestPoint.dir)}°</span>
+              <span className={styles.cardinalBadge}>{getCardinalLabel(latestPoint.dir)}</span>
+            </div>
+            {hasSpeed && (
+              <div className={styles.sidebarSpeed}>
+                {formatSpeed(latestPoint.speed, speedUnit, isBft)}
+              </div>
+            )}
+          </>
+        )}
+        {(options.showAngleSector || options.showSpeedMinMax) && (
+          <div className={styles.sidebarStats} data-testid="windtrail-sidebar-stats">
+            {options.showAngleSector && directionSector.spanDeg > 0 && (
+              <div className={styles.statRow}>
+                <span className={styles.statLabel}>Dir Range:</span>
+                <span className={styles.statValue}>
+                  {Math.round(directionSector.startDir)}°–{Math.round(directionSector.endDir)}° ({Math.round(directionSector.spanDeg)}°)
+                </span>
+              </div>
+            )}
+            {options.showSpeedMinMax && hasSpeed && (
+              <>
+                <div className={styles.statRow}>
+                  <span className={styles.statLabel}>Speed Min:</span>
+                  <span className={styles.statValue}>{formatSpeed(dataMinSpeed, speedUnit, isBft)}</span>
+                </div>
+                <div className={styles.statRow}>
+                  <span className={styles.statLabel}>Speed Max:</span>
+                  <span className={styles.statValue} style={{ color: '#f87171' }}>
+                    {formatSpeed(dataMaxSpeed, speedUnit, isBft)}
+                  </span>
+                </div>
+                {options.showSpeedAvg && (
+                  <div className={styles.statRow}>
+                    <span className={styles.statLabel}>Speed Avg:</span>
+                    <span className={styles.statValue}>{formatSpeed(dataAvgSpeed, speedUnit, isBft)}</span>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>
@@ -1094,25 +1423,45 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
       return null;
     }
     const isNarrow = width < 300;
+    const showLiveReading = options.showCurrent !== false;
     return (
       <div className={styles.bottomCurrent} data-testid="windtrail-current">
-        <span
-          style={{
-            width: 7,
-            height: 7,
-            borderRadius: '50%',
-            backgroundColor: options.headMarkerColor || '#ef4444',
-            display: 'inline-block',
-            flexShrink: 0,
-          }}
-        />
-        {!isNarrow && <span>Current:</span>}
-        <strong style={{ color: theme.colors.text.primary, whiteSpace: 'nowrap' }}>
-          {Math.round(latestPoint.dir)}° ({getCardinalLabel(latestPoint.dir)})
-        </strong>
-        {hasSpeed && (
-          <span style={{ color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>
-            {formatSpeed(latestPoint.speed, speedUnit, isBft)}
+        {showLiveReading && (
+          <>
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                backgroundColor: options.headMarkerColor || '#ef4444',
+                display: 'inline-block',
+                flexShrink: 0,
+              }}
+            />
+            {!isNarrow && <span>Current:</span>}
+            <strong style={{ color: theme.colors.text.primary, whiteSpace: 'nowrap' }}>
+              {Math.round(latestPoint.dir)}° ({getCardinalLabel(latestPoint.dir)})
+            </strong>
+            {hasSpeed && (
+              <span style={{ color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>
+                {formatSpeed(latestPoint.speed, speedUnit, isBft)}
+              </span>
+            )}
+          </>
+        )}
+        {options.showAngleSector && directionSector.spanDeg > 0 && !isNarrow && (
+          <span style={{ color: theme.colors.text.secondary, fontSize: 10, whiteSpace: 'nowrap' }} data-testid="windtrail-bottom-dir-range">
+            [{directionSector.spanDeg >= 359.9 ? '0°–360°' : `${Math.round(directionSector.startDir)}°–${Math.round(directionSector.endDir)}°`}]
+          </span>
+        )}
+        {options.showSpeedMinMax && hasSpeed && (
+          <span style={{ color: theme.colors.text.secondary, fontSize: 10, whiteSpace: 'nowrap' }} data-testid="windtrail-bottom-speed-range">
+            {isNarrow ? (
+              `${formatSpeed(dataMinSpeed, speedUnit, isBft)}–${formatSpeed(dataMaxSpeed, speedUnit, isBft)}`
+            ) : (
+              `Min: ${formatSpeed(dataMinSpeed, speedUnit, isBft)} • Max: ${formatSpeed(dataMaxSpeed, speedUnit, isBft)}`
+            )}
+            {options.showSpeedAvg && !isNarrow && ` (Avg: ${formatSpeed(dataAvgSpeed, speedUnit, isBft)})`}
           </span>
         )}
       </div>
@@ -1123,29 +1472,140 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
     if (!hasCurrentInfo || !latestPoint) {
       return null;
     }
+    const showLiveReading = options.showCurrent !== false;
     return (
       <div className={styles.hud} data-testid="windtrail-current">
         <div className={styles.hudBadge}>
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              backgroundColor: options.headMarkerColor || '#ef4444',
-              display: 'inline-block',
-            }}
-          />
-          <span>Current:</span>
-          <span style={{ color: theme.colors.text.primary }}>
-            {Math.round(latestPoint.dir)}° ({getCardinalLabel(latestPoint.dir)})
-          </span>
-          {hasSpeed && (
-            <span style={{ color: theme.colors.text.secondary }}>
-              {formatSpeed(latestPoint.speed, speedUnit, isBft)}
+          {showLiveReading && (
+            <>
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  backgroundColor: options.headMarkerColor || '#ef4444',
+                  display: 'inline-block',
+                }}
+              />
+              <span>Current:</span>
+              <span style={{ color: theme.colors.text.primary }}>
+                {Math.round(latestPoint.dir)}° ({getCardinalLabel(latestPoint.dir)})
+              </span>
+              {hasSpeed && (
+                <span style={{ color: theme.colors.text.secondary }}>
+                  {formatSpeed(latestPoint.speed, speedUnit, isBft)}
+                </span>
+              )}
+            </>
+          )}
+          {options.showAngleSector && directionSector.spanDeg > 0 && (
+            <span style={{ color: theme.colors.text.secondary, fontSize: 10 }} data-testid="windtrail-overlay-dir-range">
+              [{directionSector.spanDeg >= 359.9 ? '0°–360°' : `${Math.round(directionSector.startDir)}°–${Math.round(directionSector.endDir)}°`}]
+            </span>
+          )}
+          {options.showSpeedMinMax && hasSpeed && (
+            <span style={{ color: theme.colors.text.secondary, fontSize: 10 }} data-testid="windtrail-overlay-speed-range">
+              Min: {formatSpeed(dataMinSpeed, speedUnit, isBft)} • Max: {formatSpeed(dataMaxSpeed, speedUnit, isBft)}
             </span>
           )}
         </div>
       </div>
+    );
+  };
+
+  const renderDirectionSector = () => {
+    if (!options.showAngleSector || directionSector.spanDeg <= 0) {
+      return null;
+    }
+
+    const style: SectorStyle = options.sectorStyle ?? 'rim';
+    const baseColor = options.sectorColor || '#38bdf8';
+    const isWedge = style === 'wedge';
+    const isLines = style === 'lines';
+
+    const rOuter = maxR;
+    const rimThickness = Math.max(6, Math.min(14, maxR * 0.1));
+    const rInner = isWedge || isLines ? minR : maxR - rimThickness;
+
+    const pathData = buildSectorPath(
+      cxVal,
+      cyVal,
+      rInner,
+      rOuter,
+      directionSector.startDir,
+      directionSector.endDir,
+      directionSector.spanDeg
+    );
+
+    if (!pathData) {
+      return null;
+    }
+
+    const radStart = (directionSector.startDir * Math.PI) / 180;
+    const radEnd = (directionSector.endDir * Math.PI) / 180;
+
+    // For 'lines' mode: lines run from inner core (minR) all the way to outer perimeter (maxR).
+    // For 'rim' mode: boundary ticks cross the rim band.
+    // For 'wedge' mode: lines run along the radial wedge edges.
+    const lineInner = isLines ? minR : rInner - (isWedge ? 0 : 2);
+    const lineOuter = isLines ? maxR : rOuter + 2;
+
+    const x1Start = cxVal + lineInner * Math.sin(radStart);
+    const y1Start = cyVal - lineInner * Math.cos(radStart);
+    const x2Start = cxVal + lineOuter * Math.sin(radStart);
+    const y2Start = cyVal - lineOuter * Math.cos(radStart);
+
+    const x1End = cxVal + lineInner * Math.sin(radEnd);
+    const y1End = cyVal - lineInner * Math.cos(radEnd);
+    const x2End = cxVal + lineOuter * Math.sin(radEnd);
+    const y2End = cyVal - lineOuter * Math.cos(radEnd);
+
+    const titleText =
+      directionSector.spanDeg >= 359.9
+        ? 'Wind Direction Range: 0°–360° (Full compass rotation) • Spread: 360°'
+        : `Wind Direction Range: ${Math.round(directionSector.startDir)}° (${getCardinalLabel(directionSector.startDir)}) – ${Math.round(directionSector.endDir)}° (${getCardinalLabel(directionSector.endDir)}) • Spread: ${Math.round(directionSector.spanDeg)}°`;
+
+    return (
+      <g data-testid="windtrail-sector">
+        <path
+          d={pathData}
+          fill={isLines ? 'transparent' : baseColor}
+          fillOpacity={isLines ? 0 : isWedge ? 0.16 : 0.32}
+          stroke={isLines ? 'none' : baseColor}
+          strokeOpacity={isLines ? 0 : isWedge ? 0.45 : 0.75}
+          strokeWidth="1"
+          fillRule="evenodd"
+          pointerEvents={isLines ? 'all' : undefined}
+        >
+          <title>{titleText}</title>
+        </path>
+        {directionSector.spanDeg < 359 && (
+          <>
+            <line
+              x1={x1Start.toFixed(2)}
+              y1={y1Start.toFixed(2)}
+              x2={x2Start.toFixed(2)}
+              y2={y2Start.toFixed(2)}
+              stroke={baseColor}
+              strokeWidth={isLines ? '1.75' : '1.5'}
+              strokeLinecap="round"
+            >
+              <title>{`Sector Start: ${Math.round(directionSector.startDir)}° (${getCardinalLabel(directionSector.startDir)})`}</title>
+            </line>
+            <line
+              x1={x1End.toFixed(2)}
+              y1={y1End.toFixed(2)}
+              x2={x2End.toFixed(2)}
+              y2={y2End.toFixed(2)}
+              stroke={baseColor}
+              strokeWidth={isLines ? '1.75' : '1.5'}
+              strokeLinecap="round"
+            >
+              <title>{`Sector End: ${Math.round(directionSector.endDir)}° (${getCardinalLabel(directionSector.endDir)})`}</title>
+            </line>
+          </>
+        )}
+      </g>
     );
   };
 
@@ -1215,6 +1675,9 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
 
         {/* Central Core Indicator */}
         <circle cx={cxVal} cy={cyVal} r={minR} fill={theme.colors.border.medium} opacity={0.6} />
+
+        {/* Wind Direction Variation Sector */}
+        {renderDirectionSector()}
 
         {/* Compass Spokes and Cardinal Labels */}
         {visibleSpokes.map((spoke) => {
@@ -1437,7 +1900,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
           {renderCurrentSidebar()}
           {hasLegendInfo && (
             <div className={styles.sidebarCard}>
-              {renderLegend(Math.min(130, sidebarWidth - 28))}
+              {renderLegend(Math.max(50, sidebarWidth - 48))}
             </div>
           )}
         </div>

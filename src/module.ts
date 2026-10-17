@@ -376,6 +376,20 @@ export const plugin = new PanelPlugin<WindTrailOptions>(WindTrailPanel).setPanel
         description: 'Display a scale legend showing the wind speed color scale and thickness',
         defaultValue: false,
       })
+      .addRadio({
+        category: ['Legend & Layout'],
+        path: 'legendShape',
+        name: 'Legend bar shape',
+        description: 'Shape of the speed scale legend color bar',
+        defaultValue: 'rectangle',
+        settings: {
+          options: [
+            { value: 'rectangle', label: 'Rectangle (uniform bar)' },
+            { value: 'triangle', label: 'Triangle (tapered bar)' },
+          ],
+        },
+        showIf: (config) => Boolean(config.showLegend),
+      })
       .addSelect({
         category: ['Legend & Layout'],
         path: 'legendPosition',
@@ -391,6 +405,60 @@ export const plugin = new PanelPlugin<WindTrailOptions>(WindTrailPanel).setPanel
           ],
         },
         showIf: (config) => Boolean(config.showLegend) && (config.infoPlacement === 'overlay' || !config.infoPlacement),
+      })
+
+      // --- Statistics & Variation ---
+      .addBooleanSwitch({
+        category: ['Statistics & Variation'],
+        path: 'showAngleSector',
+        name: 'Show wind direction sector',
+        description: 'Draw a sector on the compass rose showing the angular spread (min to max direction)',
+        defaultValue: false,
+      })
+      .addRadio({
+        category: ['Statistics & Variation'],
+        path: 'sectorStyle',
+        name: 'Sector display style',
+        description: 'Choose display style for the wind direction sector',
+        defaultValue: 'rim',
+        settings: {
+          options: [
+            { value: 'rim', label: 'Outer rim band (leaves center clear)' },
+            { value: 'wedge', label: 'Radial wedge (translucent backdrop)' },
+            { value: 'lines', label: 'Sector lines (two radial lines, transparent background)' },
+          ],
+        },
+        showIf: (config) => Boolean(config.showAngleSector),
+      })
+      .addColorPicker({
+        category: ['Statistics & Variation'],
+        path: 'sectorColor',
+        name: 'Sector color',
+        defaultValue: '#38bdf8',
+        showIf: (config) => Boolean(config.showAngleSector),
+      })
+      .addBooleanSwitch({
+        category: ['Statistics & Variation'],
+        path: 'showSpeedMinMax',
+        name: 'Show min & max speed',
+        description: 'Display minimum and maximum observed speed text in telemetry readouts',
+        defaultValue: false,
+      })
+      .addBooleanSwitch({
+        category: ['Statistics & Variation'],
+        path: 'showSpeedAvg',
+        name: 'Show average speed',
+        description: 'Display average wind speed in telemetry readouts',
+        defaultValue: false,
+        showIf: (config) => Boolean(config.showSpeedMinMax),
+      })
+      .addBooleanSwitch({
+        category: ['Statistics & Variation'],
+        path: 'showLegendPins',
+        name: 'Show min/max pins on legend',
+        description: 'Display indicator pins for min and max speed directly on the speed scale legend',
+        defaultValue: false,
+        showIf: (config) => Boolean(config.showLegend),
       })
   );
 });

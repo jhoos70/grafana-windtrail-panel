@@ -9,6 +9,8 @@ export type SpeedUnit = 'auto' | 'm/s' | 'km/h' | 'knots' | 'mph' | 'ft/s' | (st
 export type DisplaySpeedUnit = 'same' | 'm/s' | 'km/h' | 'knots' | 'mph' | 'bft' | 'ft/s' | (string & {});
 export type LegendPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'bottom-center';
 export type InfoPlacement = 'auto' | 'right' | 'bottom' | 'overlay';
+export type SectorStyle = 'rim' | 'wedge' | 'lines';
+export type LegendShape = 'rectangle' | 'triangle';
 
 export interface WindTrailOptions {
   infoPlacement?: InfoPlacement;
@@ -47,4 +49,11 @@ export interface WindTrailOptions {
   speedMax?: number;
   showLegend?: boolean;
   legendPosition?: LegendPosition;
+  legendShape?: LegendShape;
+  showAngleSector?: boolean;
+  sectorStyle?: SectorStyle;
+  sectorColor?: string;
+  showSpeedMinMax?: boolean;
+  showSpeedAvg?: boolean;
+  showLegendPins?: boolean;
 }

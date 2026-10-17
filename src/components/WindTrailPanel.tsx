@@ -1266,9 +1266,6 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
 
     const isWindy = (options.colorPalette ?? 'windy') === 'windy';
     const activeStops = isWindy ? WINDY_COLOR_STOPS : STANDARD_COLOR_STOPS;
-    const gradientCss = activeStops
-      .map((s) => `rgb(${s.color.join(',')}) ${Math.round(s.stop * 100)}%`)
-      .join(', ');
 
     const hasPins = Boolean(options.showLegendPins) && hasSpeed && maxSpeed > minSpeed;
     const range = maxSpeed - minSpeed;
@@ -1279,6 +1276,10 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
     const xMaxPin = hasPins
       ? Math.max(3, Math.min(innerBarWidth - 3, ((dataMaxSpeed - minSpeed) / range) * (innerBarWidth - 6) + 3))
       : 0;
+    const isTriangle =
+      options.legendShape !== undefined
+        ? options.legendShape === 'triangle'
+        : Boolean(options.scaleWidthBySpeed);
 
     return (
       <div data-testid="windtrail-legend" style={{ maxWidth: '100%', boxSizing: 'border-box' }}>
@@ -1313,41 +1314,31 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
               </polygon>
             </svg>
           )}
-          {options.scaleWidthBySpeed ? (
-            <svg width={innerBarWidth} height="14" style={{ display: 'block', overflow: 'hidden' }}>
-              <defs>
-                <linearGradient id={legendGradId} x1="0%" y1="0%" x2="100%" y2="0%">
-                  {options.colorMode === 'speed' ? (
-                    activeStops.map((s, idx) => (
-                      <stop
-                        key={idx}
-                        offset={`${Math.round(s.stop * 100)}%`}
-                        stopColor={`rgb(${s.color.join(',')})`}
-                      />
-                    ))
-                  ) : (
-                    <>
-                      <stop offset="0%" stopColor={options.solidColor || '#38bdf8'} />
-                      <stop offset="100%" stopColor={options.solidColor || '#38bdf8'} />
-                    </>
-                  )}
-                </linearGradient>
-              </defs>
+          <svg width={innerBarWidth} height="14" style={{ display: 'block', overflow: 'hidden' }}>
+            <defs>
+              <linearGradient id={legendGradId} x1="0%" y1="0%" x2="100%" y2="0%">
+                {options.colorMode === 'speed' ? (
+                  activeStops.map((s, idx) => (
+                    <stop
+                      key={idx}
+                      offset={`${Math.round(s.stop * 100)}%`}
+                      stopColor={`rgb(${s.color.join(',')})`}
+                    />
+                  ))
+                ) : (
+                  <>
+                    <stop offset="0%" stopColor={options.solidColor || '#38bdf8'} />
+                    <stop offset="100%" stopColor={options.solidColor || '#38bdf8'} />
+                  </>
+                )}
+              </linearGradient>
+            </defs>
+            {isTriangle ? (
               <polygon points={`0,7 ${innerBarWidth},2 ${innerBarWidth},12 0,7`} fill={`url(#${legendGradId})`} />
-            </svg>
-          ) : (
-            <div
-              style={{
-                width: innerBarWidth,
-                height: 8,
-                borderRadius: 4,
-                background:
-                  options.colorMode === 'speed'
-                    ? `linear-gradient(to right, ${gradientCss})`
-                    : options.solidColor || '#38bdf8',
-              }}
-            />
-          )}
+            ) : (
+              <rect x="0" y="2" width={innerBarWidth} height="10" rx="3" ry="3" fill={`url(#${legendGradId})`} />
+            )}
+          </svg>
           <div className={styles.legendTicks(innerBarWidth)}>
             <span>{isBft ? Math.round(minSpeed) : minSpeed.toFixed(0)}</span>
             <span>{isBft ? Math.round((minSpeed + maxSpeed) / 2) : ((minSpeed + maxSpeed) / 2).toFixed(0)}</span>

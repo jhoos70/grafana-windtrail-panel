@@ -654,6 +654,118 @@ describe('WindTrailPanel', () => {
       expect(stops.length).toBe(8);
     });
 
+    it('renders rectangular speed scale legend when legendShape is rectangle', () => {
+      const now = Date.now();
+      const frame = toDataFrame({
+        fields: [
+          {
+            name: 'time',
+            type: FieldType.time,
+            values: [now - 1000, now],
+          },
+          {
+            name: 'wind_dir',
+            type: FieldType.number,
+            values: [180, 270],
+          },
+          {
+            name: 'wind_speed',
+            type: FieldType.number,
+            values: [2.5, 15.0],
+          },
+        ],
+      });
+
+      const { container } = render(
+        <WindTrailPanel
+          id={1}
+          data={{
+            series: [frame],
+            state: LoadingState.Done,
+            timeRange: {} as any,
+          }}
+          timeRange={{} as any}
+          onFieldConfigChange={jest.fn()}
+          options={{
+            ...defaultOptions,
+            showLegend: true,
+            legendShape: 'rectangle',
+            scaleWidthBySpeed: true,
+          }}
+          width={500}
+          height={500}
+          fieldConfig={{} as any}
+          renderCounter={0}
+          title="Wind Trail"
+          transparent={false}
+          replaceVariables={(s) => s}
+          onOptionsChange={jest.fn()}
+          eventBus={{} as any}
+          timeZone="browser"
+          onChangeTimeRange={jest.fn()}
+        />
+      );
+
+      expect(container.querySelector('rect')).toBeInTheDocument();
+      expect(container.querySelector('polygon')).not.toBeInTheDocument();
+    });
+
+    it('renders triangular speed scale legend when legendShape is triangle', () => {
+      const now = Date.now();
+      const frame = toDataFrame({
+        fields: [
+          {
+            name: 'time',
+            type: FieldType.time,
+            values: [now - 1000, now],
+          },
+          {
+            name: 'wind_dir',
+            type: FieldType.number,
+            values: [180, 270],
+          },
+          {
+            name: 'wind_speed',
+            type: FieldType.number,
+            values: [2.5, 15.0],
+          },
+        ],
+      });
+
+      const { container } = render(
+        <WindTrailPanel
+          id={1}
+          data={{
+            series: [frame],
+            state: LoadingState.Done,
+            timeRange: {} as any,
+          }}
+          timeRange={{} as any}
+          onFieldConfigChange={jest.fn()}
+          options={{
+            ...defaultOptions,
+            showLegend: true,
+            legendShape: 'triangle',
+            scaleWidthBySpeed: false,
+          }}
+          width={500}
+          height={500}
+          fieldConfig={{} as any}
+          renderCounter={0}
+          title="Wind Trail"
+          transparent={false}
+          replaceVariables={(s) => s}
+          onOptionsChange={jest.fn()}
+          eventBus={{} as any}
+          timeZone="browser"
+          onChangeTimeRange={jest.fn()}
+        />
+      );
+
+      expect(container.querySelector('polygon')).toBeInTheDocument();
+      expect(container.querySelector('rect')).not.toBeInTheDocument();
+    });
+
     it('renders dynamic bounds when speedScaleMode is auto', () => {
       const now = Date.now();
       const frame = toDataFrame({

@@ -376,6 +376,20 @@ export const plugin = new PanelPlugin<WindTrailOptions>(WindTrailPanel).setPanel
         description: 'Display a scale legend showing the wind speed color scale and thickness',
         defaultValue: false,
       })
+      .addRadio({
+        category: ['Legend & Layout'],
+        path: 'legendShape',
+        name: 'Legend bar shape',
+        description: 'Shape of the speed scale legend color bar',
+        defaultValue: 'rectangle',
+        settings: {
+          options: [
+            { value: 'rectangle', label: 'Rectangle (uniform bar)' },
+            { value: 'triangle', label: 'Triangle (tapered bar)' },
+          ],
+        },
+        showIf: (config) => Boolean(config.showLegend),
+      })
       .addSelect({
         category: ['Legend & Layout'],
         path: 'legendPosition',

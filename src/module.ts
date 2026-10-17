@@ -392,5 +392,58 @@ export const plugin = new PanelPlugin<WindTrailOptions>(WindTrailPanel).setPanel
         },
         showIf: (config) => Boolean(config.showLegend) && (config.infoPlacement === 'overlay' || !config.infoPlacement),
       })
+
+      // --- Statistics & Variation ---
+      .addBooleanSwitch({
+        category: ['Statistics & Variation'],
+        path: 'showAngleSector',
+        name: 'Show wind direction sector',
+        description: 'Draw a sector on the compass rose showing the angular spread (min to max direction)',
+        defaultValue: false,
+      })
+      .addRadio({
+        category: ['Statistics & Variation'],
+        path: 'sectorStyle',
+        name: 'Sector display style',
+        description: 'Choose between an outer rim arc or a full radial wedge',
+        defaultValue: 'rim',
+        settings: {
+          options: [
+            { value: 'rim', label: 'Outer rim band (leaves center clear)' },
+            { value: 'wedge', label: 'Radial wedge (translucent backdrop)' },
+          ],
+        },
+        showIf: (config) => Boolean(config.showAngleSector),
+      })
+      .addColorPicker({
+        category: ['Statistics & Variation'],
+        path: 'sectorColor',
+        name: 'Sector color',
+        defaultValue: '#38bdf8',
+        showIf: (config) => Boolean(config.showAngleSector),
+      })
+      .addBooleanSwitch({
+        category: ['Statistics & Variation'],
+        path: 'showSpeedMinMax',
+        name: 'Show min & max speed',
+        description: 'Display minimum and maximum observed speed text in telemetry readouts',
+        defaultValue: false,
+      })
+      .addBooleanSwitch({
+        category: ['Statistics & Variation'],
+        path: 'showSpeedAvg',
+        name: 'Show average speed',
+        description: 'Display average wind speed in telemetry readouts',
+        defaultValue: false,
+        showIf: (config) => Boolean(config.showSpeedMinMax),
+      })
+      .addBooleanSwitch({
+        category: ['Statistics & Variation'],
+        path: 'showLegendPins',
+        name: 'Show min/max pins on legend',
+        description: 'Display indicator pins for min and max speed directly on the speed scale legend',
+        defaultValue: false,
+        showIf: (config) => Boolean(config.showLegend),
+      })
   );
 });

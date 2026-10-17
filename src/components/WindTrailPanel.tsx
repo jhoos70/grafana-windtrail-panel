@@ -1562,6 +1562,7 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
           stroke={baseColor}
           strokeOpacity={isWedge ? 0.45 : 0.75}
           strokeWidth="1"
+          fillRule="evenodd"
         >
           <title>
             {directionSector.spanDeg >= 359.9

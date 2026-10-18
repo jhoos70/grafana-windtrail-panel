@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.3.0
+
+### Features & Enhancements
+- **Wind Direction Variation Sector (`showAngleSector`)**: Visualizes the directional variability corridor over the selected time range:
+  - **Shortest-Angle Chronological Tracking**: Accurately tracks directional shifts across North ($0^\circ/360^\circ$, e.g. turning from $270^\circ$ through North to $110^\circ$) by unwrapping angles in chronological order.
+  - **Calm Speed Filtering**: Automatically filters out calm wind readings (speed = 0) that carry no meaningful direction to prevent distorted sector spans.
+  - **Three Visual Styles (`sectorStyle`)**:
+    - `'rim'` (Default): Annular rim arc hugging the outer edge of the compass rose with radial boundary ticks.
+    - `'wedge'`: Translucent pie/donut wedge across the compass dial.
+    - `'lines'`: Two radial sector boundary lines from center to perimeter with transparent background.
+  - Configurable sector color via dedicated color picker.
+- **Min & Max Wind Speed Telemetry (`showSpeedMinMax`)**:
+  - **Sidebar Mode**: Dedicated readouts for Direction Range, Min Speed, Max Speed (highlighted in red), and Average Speed.
+  - **Bottom Bar Mode**: Inline compact range badges.
+  - **Overlay HUD Mode**: Integrated Min & Max speed readout.
+- **Speed Scale Legend Pins (`showLegendPins`)**: Interactive min (blue) and max (red) indicator pins directly on the speed scale legend gradient bar.
+- **Speed Scale Legend Shape Option (`legendShape`)**: Added choice between the classic tapering triangle (`'triangle'`) and a modern uniform rectangle (`'rectangle'`).
+- **Boundary Containment**: Constrained legend bars and indicator pin markers strictly within card boundaries to prevent visual clipping or overflow.
+
 ## 1.2.0
 
 ### Features & Enhancements

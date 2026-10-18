@@ -13,6 +13,8 @@ import {
   computeVectorAverageDirection,
   downsamplePoints,
   RawWindPoint,
+  computeDirectionSector,
+  buildSectorPath,
 } from './WindTrailPanel';
 import { FieldType, LoadingState, toDataFrame } from '@grafana/data';
 import { WindTrailOptions } from '../types';
@@ -652,6 +654,118 @@ describe('WindTrailPanel', () => {
       expect(stops.length).toBe(8);
     });
 
+    it('renders rectangular speed scale legend when legendShape is rectangle', () => {
+      const now = Date.now();
+      const frame = toDataFrame({
+        fields: [
+          {
+            name: 'time',
+            type: FieldType.time,
+            values: [now - 1000, now],
+          },
+          {
+            name: 'wind_dir',
+            type: FieldType.number,
+            values: [180, 270],
+          },
+          {
+            name: 'wind_speed',
+            type: FieldType.number,
+            values: [2.5, 15.0],
+          },
+        ],
+      });
+
+      const { container } = render(
+        <WindTrailPanel
+          id={1}
+          data={{
+            series: [frame],
+            state: LoadingState.Done,
+            timeRange: {} as any,
+          }}
+          timeRange={{} as any}
+          onFieldConfigChange={jest.fn()}
+          options={{
+            ...defaultOptions,
+            showLegend: true,
+            legendShape: 'rectangle',
+            scaleWidthBySpeed: true,
+          }}
+          width={500}
+          height={500}
+          fieldConfig={{} as any}
+          renderCounter={0}
+          title="Wind Trail"
+          transparent={false}
+          replaceVariables={(s) => s}
+          onOptionsChange={jest.fn()}
+          eventBus={{} as any}
+          timeZone="browser"
+          onChangeTimeRange={jest.fn()}
+        />
+      );
+
+      expect(container.querySelector('rect')).toBeInTheDocument();
+      expect(container.querySelector('polygon')).not.toBeInTheDocument();
+    });
+
+    it('renders triangular speed scale legend when legendShape is triangle', () => {
+      const now = Date.now();
+      const frame = toDataFrame({
+        fields: [
+          {
+            name: 'time',
+            type: FieldType.time,
+            values: [now - 1000, now],
+          },
+          {
+            name: 'wind_dir',
+            type: FieldType.number,
+            values: [180, 270],
+          },
+          {
+            name: 'wind_speed',
+            type: FieldType.number,
+            values: [2.5, 15.0],
+          },
+        ],
+      });
+
+      const { container } = render(
+        <WindTrailPanel
+          id={1}
+          data={{
+            series: [frame],
+            state: LoadingState.Done,
+            timeRange: {} as any,
+          }}
+          timeRange={{} as any}
+          onFieldConfigChange={jest.fn()}
+          options={{
+            ...defaultOptions,
+            showLegend: true,
+            legendShape: 'triangle',
+            scaleWidthBySpeed: false,
+          }}
+          width={500}
+          height={500}
+          fieldConfig={{} as any}
+          renderCounter={0}
+          title="Wind Trail"
+          transparent={false}
+          replaceVariables={(s) => s}
+          onOptionsChange={jest.fn()}
+          eventBus={{} as any}
+          timeZone="browser"
+          onChangeTimeRange={jest.fn()}
+        />
+      );
+
+      expect(container.querySelector('polygon')).toBeInTheDocument();
+      expect(container.querySelector('rect')).not.toBeInTheDocument();
+    });
+
     it('renders dynamic bounds when speedScaleMode is auto', () => {
       const now = Date.now();
       const frame = toDataFrame({
@@ -1054,6 +1168,276 @@ describe('WindTrailPanel', () => {
       );
 
       expect(queryByText(/Current/i)).toBeNull();
+    });
+
+    describe('computeDirectionSector', () => {
+      it('returns 0 for empty array', () => {
+        expect(computeDirectionSector([])).toEqual({ startDir: 0, endDir: 0, spanDeg: 0 });
+      });
+
+      it('returns identical start and end for single point', () => {
+        expect(computeDirectionSector([180])).toEqual({ startDir: 180, endDir: 180, spanDeg: 0 });
+      });
+
+      it('calculates sector without crossing North', () => {
+        const sector = computeDirectionSector([180, 190, 210]);
+        expect(sector.startDir).toBe(180);
+        expect(sector.endDir).toBe(210);
+        expect(sector.spanDeg).toBe(30);
+      });
+
+      it('calculates sector crossing North correctly', () => {
+        const sector = computeDirectionSector([340, 350, 10, 20]);
+        expect(sector.startDir).toBe(340);
+        expect(sector.endDir).toBe(20);
+        expect(sector.spanDeg).toBe(40);
+      });
+
+      it('handles turning from 270° through North to 100°', () => {
+        const sector = computeDirectionSector([270, 310, 350, 40, 100]);
+        expect(sector.startDir).toBe(270);
+        expect(sector.endDir).toBe(100);
+        expect(sector.spanDeg).toBe(190);
+      });
+
+      it('handles turning from 100° through South to 270°', () => {
+        const sector = computeDirectionSector([100, 160, 220, 270]);
+        expect(sector.startDir).toBe(100);
+        expect(sector.endDir).toBe(270);
+        expect(sector.spanDeg).toBe(170);
+      });
+
+      it('filters out calm readings (speed 0) that distort the directional turning corridor', () => {
+        const sector = computeDirectionSector(
+          [270, 310, 0, 100],
+          [5, 5, 0, 5]
+        );
+        expect(sector.startDir).toBe(270);
+        expect(sector.endDir).toBe(100);
+        expect(sector.spanDeg).toBe(190);
+      });
+
+      it('handles dead calm throughout the time window gracefully', () => {
+        const sector = computeDirectionSector(
+          [0, 0, 0],
+          [0, 0, 0],
+          true
+        );
+        expect(sector).toEqual({ startDir: 0, endDir: 0, spanDeg: 0 });
+      });
+
+      it('handles full 360 degree rotation across all compass directions', () => {
+        const sector = computeDirectionSector([210, 310, 100, 160, 270, 360]);
+        expect(sector.spanDeg).toBe(360);
+        expect(sector.startDir).toBe(0);
+        expect(sector.endDir).toBe(360);
+      });
+    });
+
+    describe('buildSectorPath', () => {
+      it('returns empty string for non-positive span', () => {
+        expect(buildSectorPath(100, 100, 50, 80, 0, 0, 0)).toBe('');
+      });
+
+      it('generates annular rim path', () => {
+        const path = buildSectorPath(100, 100, 70, 80, 0, 90, 90);
+        expect(path).toContain('M');
+        expect(path).toContain('A 80 80');
+        expect(path).toContain('A 70 70');
+        expect(path).toContain('Z');
+      });
+
+      it('generates radial wedge path when rInner is 0', () => {
+        const path = buildSectorPath(100, 100, 0, 80, 0, 90, 90);
+        expect(path).toContain('M 100.00 100.00');
+        expect(path).toContain('A 80 80');
+        expect(path).toContain('Z');
+      });
+
+      it('handles 360 degree full circle annular ring', () => {
+        const path = buildSectorPath(100, 100, 70, 80, 0, 360, 360);
+        expect(path).toContain('M');
+        expect(path).toContain('A 80 80');
+        expect(path).toContain('A 70 70');
+      });
+
+      it('handles 360 degree full circle radial wedge disk (rInner = 0)', () => {
+        const path = buildSectorPath(100, 100, 0, 80, 0, 360, 360);
+        expect(path).toContain('M');
+        expect(path).toContain('A 80 80');
+        expect(path).not.toContain('A 0 0');
+      });
+    });
+
+    it('renders wind direction sector when showAngleSector is true', () => {
+      const now = Date.now();
+      const frame = toDataFrame({
+        fields: [
+          { name: 'time', type: FieldType.time, values: [now - 60000, now - 30000, now] },
+          { name: 'wind_dir', type: FieldType.number, values: [340, 0, 20] },
+          { name: 'wind_speed', type: FieldType.number, values: [5, 8, 12] },
+        ],
+      });
+
+      const { getByTestId } = render(
+        <WindTrailPanel
+          id={1}
+          data={{ series: [frame], state: LoadingState.Done, timeRange: {} as any }}
+          timeRange={{} as any}
+          onFieldConfigChange={jest.fn()}
+          options={{
+            ...defaultOptions,
+            showAngleSector: true,
+            sectorStyle: 'rim',
+            sectorColor: '#38bdf8',
+          }}
+          width={400}
+          height={400}
+          fieldConfig={{} as any}
+          renderCounter={0}
+          title="Wind Trail"
+          transparent={false}
+          replaceVariables={(s) => s}
+          onOptionsChange={jest.fn()}
+          eventBus={{} as any}
+          timeZone="browser"
+          onChangeTimeRange={jest.fn()}
+        />
+      );
+
+      expect(getByTestId('windtrail-sector')).toBeInTheDocument();
+    });
+
+    it('renders wind direction sector with sectorStyle lines (transparent background and radial lines)', () => {
+      const now = Date.now();
+      const frame = toDataFrame({
+        fields: [
+          { name: 'time', type: FieldType.time, values: [now - 60000, now - 30000, now] },
+          { name: 'wind_dir', type: FieldType.number, values: [270, 310, 100] },
+          { name: 'wind_speed', type: FieldType.number, values: [5, 8, 12] },
+        ],
+      });
+
+      const { getByTestId } = render(
+        <WindTrailPanel
+          id={1}
+          data={{ series: [frame], state: LoadingState.Done, timeRange: {} as any }}
+          timeRange={{} as any}
+          onFieldConfigChange={jest.fn()}
+          options={{
+            ...defaultOptions,
+            showAngleSector: true,
+            sectorStyle: 'lines',
+            sectorColor: '#38bdf8',
+          }}
+          width={400}
+          height={400}
+          fieldConfig={{} as any}
+          renderCounter={0}
+          title="Wind Trail"
+          transparent={false}
+          replaceVariables={(s) => s}
+          onOptionsChange={jest.fn()}
+          eventBus={{} as any}
+          timeZone="browser"
+          onChangeTimeRange={jest.fn()}
+        />
+      );
+
+      const sectorGroup = getByTestId('windtrail-sector');
+      expect(sectorGroup).toBeInTheDocument();
+      const path = sectorGroup.querySelector('path');
+      expect(path).toHaveAttribute('fill', 'transparent');
+      expect(path).toHaveAttribute('stroke', 'none');
+
+      const lines = sectorGroup.querySelectorAll('line');
+      expect(lines).toHaveLength(2);
+      expect(lines[0]).toHaveAttribute('stroke', '#38bdf8');
+      expect(lines[1]).toHaveAttribute('stroke', '#38bdf8');
+    });
+
+    it('renders min and max speed statistics when showSpeedMinMax is true', () => {
+      const now = Date.now();
+      const frame = toDataFrame({
+        fields: [
+          { name: 'time', type: FieldType.time, values: [now - 60000, now - 30000, now] },
+          { name: 'wind_dir', type: FieldType.number, values: [180, 190, 200] },
+          { name: 'wind_speed', type: FieldType.number, values: [2.5, 7.0, 14.2] },
+        ],
+      });
+
+      const { getByTestId, getByText, getAllByText } = render(
+        <WindTrailPanel
+          id={1}
+          data={{ series: [frame], state: LoadingState.Done, timeRange: {} as any }}
+          timeRange={{} as any}
+          onFieldConfigChange={jest.fn()}
+          options={{
+            ...defaultOptions,
+            infoPlacement: 'right',
+            showSpeedMinMax: true,
+            showSpeedAvg: true,
+            showAngleSector: true,
+          }}
+          width={600}
+          height={400}
+          fieldConfig={{} as any}
+          renderCounter={0}
+          title="Wind Trail"
+          transparent={false}
+          replaceVariables={(s) => s}
+          onOptionsChange={jest.fn()}
+          eventBus={{} as any}
+          timeZone="browser"
+          onChangeTimeRange={jest.fn()}
+        />
+      );
+
+      expect(getByTestId('windtrail-sidebar-stats')).toBeInTheDocument();
+      expect(getByText(/Dir Range:/i)).toBeInTheDocument();
+      expect(getByText(/Speed Min:/i)).toBeInTheDocument();
+      expect(getByText(/Speed Max:/i)).toBeInTheDocument();
+      expect(getByText(/Speed Avg:/i)).toBeInTheDocument();
+      expect(getByText(/2.5 m\/s/i)).toBeInTheDocument();
+      expect(getAllByText(/14.2 m\/s/i)).toHaveLength(2);
+    });
+
+    it('renders min and max speed pins on legend when showLegendPins is true', () => {
+      const now = Date.now();
+      const frame = toDataFrame({
+        fields: [
+          { name: 'time', type: FieldType.time, values: [now - 60000, now] },
+          { name: 'wind_dir', type: FieldType.number, values: [180, 200] },
+          { name: 'wind_speed', type: FieldType.number, values: [3, 15] },
+        ],
+      });
+
+      const { getByTestId } = render(
+        <WindTrailPanel
+          id={1}
+          data={{ series: [frame], state: LoadingState.Done, timeRange: {} as any }}
+          timeRange={{} as any}
+          onFieldConfigChange={jest.fn()}
+          options={{
+            ...defaultOptions,
+            showLegend: true,
+            showLegendPins: true,
+          }}
+          width={400}
+          height={400}
+          fieldConfig={{} as any}
+          renderCounter={0}
+          title="Wind Trail"
+          transparent={false}
+          replaceVariables={(s) => s}
+          onOptionsChange={jest.fn()}
+          eventBus={{} as any}
+          timeZone="browser"
+          onChangeTimeRange={jest.fn()}
+        />
+      );
+
+      expect(getByTestId('windtrail-legend-pins')).toBeInTheDocument();
     });
   });
 });

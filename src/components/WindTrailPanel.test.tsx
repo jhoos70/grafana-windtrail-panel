@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react';
+import { render, within } from '@testing-library/react';
 import {
   WindTrailPanel,
   getCardinalLabel,
@@ -611,7 +611,7 @@ describe('WindTrailPanel', () => {
         ],
       });
 
-      const { getByText, container } = render(
+      const { getByText, getByTestId, container } = render(
         <WindTrailPanel
           id={1}
           data={{
@@ -646,7 +646,7 @@ describe('WindTrailPanel', () => {
       // Legend title
       expect(getByText(/Speed \(m\/s\)/i)).toBeInTheDocument();
       // Default fixed max for m/s is 20 m/s
-      expect(getByText(/20 m\/s/i)).toBeInTheDocument();
+      expect(within(getByTestId('windtrail-legend')).getByText('20')).toBeInTheDocument();
       // Polygon for thickness scale wedge
       expect(container.querySelector('polygon')).toBeInTheDocument();
       // Windy gradient has 8 stops
@@ -788,7 +788,7 @@ describe('WindTrailPanel', () => {
         ],
       });
 
-      const { getByText } = render(
+      const { getByTestId } = render(
         <WindTrailPanel
           id={1}
           data={{
@@ -819,7 +819,7 @@ describe('WindTrailPanel', () => {
       );
 
       // In auto mode, scales to data max (15 m/s)
-      expect(getByText(/15 m\/s/i)).toBeInTheDocument();
+      expect(within(getByTestId('windtrail-legend')).getByText('15')).toBeInTheDocument();
     });
 
     it('renders custom bounds when fixedSpeedMax is provided', () => {
@@ -844,7 +844,7 @@ describe('WindTrailPanel', () => {
         ],
       });
 
-      const { getByText, container } = render(
+      const { getByTestId, container } = render(
         <WindTrailPanel
           id={1}
           data={{
@@ -878,7 +878,7 @@ describe('WindTrailPanel', () => {
       );
 
       // Overridden max: 40 m/s
-      expect(getByText(/40 m\/s/i)).toBeInTheDocument();
+      expect(within(getByTestId('windtrail-legend')).getByText('40')).toBeInTheDocument();
       // Standard palette has 6 stops
       const stops = container.querySelectorAll('linearGradient stop');
       expect(stops.length).toBe(6);

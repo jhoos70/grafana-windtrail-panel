@@ -845,8 +845,8 @@ const getStyles = () => {
       white-space: nowrap;
     `,
     legendTicks: (ticksWidth = 120) => css`
-      display: flex;
-      justify-content: space-between;
+      position: relative;
+      height: 12px;
       width: ${ticksWidth}px;
       font-size: 9px;
       color: rgba(255, 255, 255, 0.65);
@@ -1271,11 +1271,17 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
     const range = maxSpeed - minSpeed;
     const innerBarWidth = Math.max(20, barWidth - 4);
     const xMinPin = hasPins
-      ? Math.max(3, Math.min(innerBarWidth - 3, ((dataMinSpeed - minSpeed) / range) * (innerBarWidth - 6) + 3))
+      ? Math.max(0, Math.min(innerBarWidth, ((dataMinSpeed - minSpeed) / range) * innerBarWidth))
       : 0;
     const xMaxPin = hasPins
-      ? Math.max(3, Math.min(innerBarWidth - 3, ((dataMaxSpeed - minSpeed) / range) * (innerBarWidth - 6) + 3))
+      ? Math.max(0, Math.min(innerBarWidth, ((dataMaxSpeed - minSpeed) / range) * innerBarWidth))
       : 0;
+    // Beaufort values are integers, so label every few steps; other units get min, middle and max
+    const bftStep = range >= 12 ? 3 : 2;
+    const legendTicks =
+      isBft && range >= bftStep
+        ? Array.from({ length: Math.floor(range / bftStep) + 1 }, (_, i) => minSpeed + i * bftStep)
+        : [minSpeed, (minSpeed + maxSpeed) / 2, maxSpeed];
     const isTriangle =
       options.legendShape !== undefined
         ? options.legendShape === 'triangle'
@@ -1340,9 +1346,18 @@ export const WindTrailPanel: React.FC<Props> = ({ options, data, width, height, 
             )}
           </svg>
           <div className={styles.legendTicks(innerBarWidth)}>
-            <span>{isBft ? Math.round(minSpeed) : minSpeed.toFixed(0)}</span>
-            <span>{isBft ? Math.round((minSpeed + maxSpeed) / 2) : ((minSpeed + maxSpeed) / 2).toFixed(0)}</span>
-            <span>{isBft ? `${Math.round(maxSpeed)} Bft` : `${maxSpeed.toFixed(0)} ${speedUnit}`}</span>
+            {legendTicks.map((tick, idx) => (
+              <span
+                key={tick}
+                style={{
+                  position: 'absolute',
+                  left: `${((tick - minSpeed) / range) * 100}%`,
+                  transform: `translateX(${idx === 0 ? '0' : idx === legendTicks.length - 1 ? '-100%' : '-50%'})`,
+                }}
+              >
+                {isBft ? Math.round(tick) : tick.toFixed(0)}
+              </span>
+            ))}
           </div>
         </div>
       </div>

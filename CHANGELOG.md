@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.5
+
+### Fixes
+- **Speed scale legend**: pins are now placed linearly across the full bar width, so they line up with the tick labels.
+- **Speed scale legend**: tick labels sit at their true positions on the bar. The unit is no longer repeated on the max tick, as the legend title already shows it.
+- **Beaufort legend**: labelled every 3 steps (every 2 on smaller scales) instead of only 0 / 6 / 12.
+
 ## 1.3.0
 
 ### Features & Enhancements

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.6
+
+### Maintenance
+- Updated to the latest Grafana create-plugin tooling (9.0.3); removes the `braces` fork override and regenerates the lockfile.
+- Replaced the scaffold `src/README.md` with an overview, data requirements and configuration guidance for the catalog.
+
 ## 1.3.5
 
 ### Fixes

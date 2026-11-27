@@ -19,7 +19,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: grafana/plugin-actions/build-plugin@build-plugin/v2.0.0
+      - uses: grafana/plugin-actions/build-plugin@build-plugin/v2.0.2
         # Signs the plugin (community signature level, granted after catalog review).
         # Token: Grafana Cloud > My Account > Security > Access Policies, scope plugins:write.
         # See https://grafana.com/developers/plugin-tools/publish-a-plugin/sign-a-plugin

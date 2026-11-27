@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.7
+
+### Maintenance
+- Release builds are now signed with a Grafana community signature (required for the plugin catalog).
+
 ## 1.3.6
 
 ### Maintenance

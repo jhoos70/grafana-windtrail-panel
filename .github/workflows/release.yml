@@ -25,3 +25,5 @@ jobs:
         # See https://grafana.com/developers/plugin-tools/publish-a-plugin/sign-a-plugin
         with:
           policy_token: ${{ secrets.GRAFANA_ACCESS_POLICY_TOKEN }}
+          # @grafana/sign-plugin 4.x requires Node >= 24.5 (action default is 22)
+          node-version: '24'
